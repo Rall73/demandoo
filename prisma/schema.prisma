@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Planos ───────────────────────────────────────────────────────────────────
+
+model Plan {
+  id         Int      @id @default(autoincrement())
+  slug       String   @unique @db.VarChar(50)
+  name       String   @db.VarChar(100)
+  priceCents Int      @default(0)
+  aiQuota    Int?
+  maxUsers   Int      @default(1)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  companies Company[]
+
+  @@map("plans")
+}
+
+// ─── Empresa (tenant) ─────────────────────────────────────────────────────────
+
+model Company {
+  id            Int       @id @default(autoincrement())
+  name          String    @db.VarChar(200)
+  slug          String    @unique @db.VarChar(100)
+  email         String    @db.VarChar(255)
+  planId        Int       @default(1)
+  planExpiresAt DateTime?
+  aiUsedTotal   Int       @default(0)
+  active        Boolean   @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  plan     Plan      @relation(fields: [planId], references: [id])
+  users    User[]
+  demandas Demanda[]
+
+  @@map("companies")
+}
+
+// ─── Usuário ──────────────────────────────────────────────────────────────────
+
+model User {
+  id            Int       @id @default(autoincrement())
+  companyId     Int
+  name          String    @db.VarChar(200)
+  email         String    @unique @db.VarChar(255)
+  emailVerified DateTime?
+  passwordHash  String?   @db.VarChar(255)
+  role          UserRole  @default(USER)
+  active        Boolean   @default(true)
+  lgpdConsentAt DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  accounts Account[]
+  sessions Session[]
+  demandas Demanda[]
+
+  @@index([companyId])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+// ─── Auth.js v5 ───────────────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Captura (Demandas / Tarefas / Ideias) ────────────────────────────────────
+
+enum DemandaTipo {
+  DEMANDA
+  TAREFA
+  IDEIA
+}
+
+enum DemandaStatus {
+  ABERTA
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+}
+
+enum DemandaPrioridade {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+model Demanda {
+  id                Int               @id @default(autoincrement())
+  companyId         Int
+  userId            Int
+  titulo            String            @db.VarChar(500)
+  descricao         String?           @db.Text
+  tipo              DemandaTipo       @default(DEMANDA)
+  status            DemandaStatus     @default(ABERTA)
+  prioridade        DemandaPrioridade @default(MEDIA)
+  prazo             DateTime?
+  solicitanteNome   String?           @db.VarChar(200)
+  solicitanteUserId Int?
+  delegadoUserId    Int?
+  audioUrl          String?           @db.VarChar(1000)
+  deletedAt         DateTime?
+  deletedBy         Int?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  company Company       @relation(fields: [companyId], references: [id])
+  user    User          @relation(fields: [userId], references: [id])
+  acoes   AcaoDemanda[]
+
+  @@index([companyId, userId])
+  @@index([companyId, tipo])
+  @@index([companyId, status])
+  @@index([prazo])
+  @@map("demandas")
+}
+
+model AcaoDemanda {
+  id        Int      @id @default(autoincrement())
+  demandaId Int
+  descricao String   @db.VarChar(1000)
+  feita     Boolean  @default(false)
+  ordem     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  demanda Demanda @relation(fields: [demandaId], references: [id], onDelete: Cascade)
+
+  @@map("acoes_demanda")
+}
