@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
@@ -8,21 +9,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   pages: {
-    signIn:  "/auth/login",
-    error:   "/auth/login",
+    signIn: "/auth/login",
+    error:  "/auth/login",
   },
   providers: [
+    // ─── Google OAuth ────────────────────────────────────────────────────────
+    Google({
+      clientId:     process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
+    }),
+
+    // ─── E-mail + Senha ───────────────────────────────────────────────────────
     Credentials({
       name: "credentials",
       credentials: {
-        email:    { label: "E-mail",  type: "email" },
-        password: { label: "Senha",   type: "password" },
+        email:    { label: "E-mail", type: "email" },
+        password: { label: "Senha",  type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
         const user = await prisma.user.findUnique({
-          where: { email: String(credentials.email) },
+          where:   { email: String(credentials.email) },
           include: { company: { include: { plan: true } } },
         })
 
@@ -48,23 +57,78 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        const u = user as {
-          id: string; companyId: number; companyName: string;
-          planSlug: string; aiQuota: number | null; aiUsedTotal: number; role: string
+    // ─── signIn: garante que usuário Google tem empresa criada ────────────────
+    async signIn({ user, account }) {
+      // Só executa para OAuth (Google). Credentials é tratado no authorize().
+      if (account?.provider !== "google") return true
+      if (!user.email) return false
+
+      try {
+        const existing = await prisma.user.findUnique({
+          where: { email: user.email },
+        })
+
+        if (!existing) {
+          // Primeiro acesso via Google → cria empresa + usuário
+          const nomeEmpresa = user.name ?? user.email.split("@")[0]
+          const baseSlug    = nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").slice(0, 50)
+          const slugFinal   = `${baseSlug}-${Date.now()}`
+
+          await prisma.$transaction(async (tx) => {
+            const company = await tx.company.create({
+              data: {
+                name:   nomeEmpresa,
+                slug:   slugFinal,
+                email:  user.email!,
+                planId: 1,
+              },
+            })
+
+            await tx.user.create({
+              data: {
+                companyId:     company.id,
+                name:          user.name ?? nomeEmpresa,
+                email:         user.email!,
+                emailVerified: new Date(), // Google já verificou
+                role:          "ADMIN",
+                lgpdConsentAt: new Date(),
+              },
+            })
+          })
         }
-        token.id          = u.id
-        token.companyId   = u.companyId
-        token.companyName = u.companyName
-        token.planSlug    = u.planSlug
-        token.aiQuota     = u.aiQuota
-        token.aiUsedTotal = u.aiUsedTotal
-        token.role        = u.role
+
+        return true
+      } catch (err) {
+        console.error("[signIn Google]", err)
+        return false
+      }
+    },
+
+    // ─── JWT: carrega dados do banco para o token ─────────────────────────────
+    async jwt({ token, user, account }) {
+      // Na primeira autenticação, `user` vem populado
+      if (user || account) {
+        const dbUser = await prisma.user.findUnique({
+          where:   { email: token.email! },
+          include: { company: { include: { plan: true } } },
+        })
+
+        if (dbUser) {
+          token.id          = String(dbUser.id)
+          token.companyId   = dbUser.companyId
+          token.companyName = dbUser.company.name
+          token.planSlug    = dbUser.company.plan.slug
+          token.aiQuota     = dbUser.company.plan.aiQuota
+          token.aiUsedTotal = dbUser.company.aiUsedTotal
+          token.role        = dbUser.role
+        }
       }
       return token
     },
+
+    // ─── Session: expõe dados do token para o cliente ─────────────────────────
     async session({ session, token }) {
       session.user.id          = token.id          as string
       session.user.companyId   = token.companyId   as number
