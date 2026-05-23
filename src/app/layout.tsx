@@ -5,9 +5,15 @@ import "./globals.css"
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" })
 
 export const metadata: Metadata = {
-  title: "demandoo — Capture qualquer demanda em segundos",
+  title:       "demandoo — Capture qualquer demanda em segundos",
   description: "Fale, escreva, organize — a IA estrutura tudo automaticamente. Demandas, tarefas e ideias em um só lugar.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://demandoo.net"),
+  manifest:    "/manifest.json",
+  appleWebApp: {
+    capable:           true,
+    statusBarStyle:    "default",
+    title:             "demandoo",
+  },
   openGraph: {
     title:       "demandoo",
     description: "Capture qualquer demanda em segundos. A IA faz o resto.",

@@ -6,8 +6,9 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
+  adapter:   PrismaAdapter(prisma),
+  session:   { strategy: "jwt" },
+  trustHost: true, // necessário na Hostinger (proxy reverso)
   pages: {
     signIn: "/auth/login",
     error:  "/auth/login",
