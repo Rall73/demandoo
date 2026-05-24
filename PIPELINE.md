@@ -254,7 +254,7 @@ npx tsc --noEmit && npx next build && git push origin main
 
 | Item | Impacto | Observações |
 |---|---|---|
-| SMTP: App Password Gmail necessário | 🔴 Crítico | Sem isso, verificação de e-mail e reset de senha não funcionam |
+| SMTP: migrado para Hostinger (noreply@demandoo.net) | ✅ Resolvido | smtp.hostinger.com:465 (SSL) — funciona local e produção. **Atenção:** senha do mailbox não pode conter `#` ou outros especiais — parser de env var trunca a string → `535 auth failed`. Senha atual: só alphanum. |
 | `.env` tinha segredos commitados | 🟡 Resolvido | Corrigido em 2026-05-24 — agora só placeholders |
 | `delegadoNome` ainda é texto livre | 🟡 Médio | Não vincula ao `users.id`; melhorar quando multi-usuário chegar |
 | Queries sem paginação (take: 100) | 🟡 Médio | OK para MVP; escalar quando base crescer |
@@ -279,9 +279,12 @@ npx tsc --noEmit && npx next build && git push origin main
 > Atualizar esta seção a cada sprint.
 
 ### Sprint atual
-- [ ] Configurar App Password Gmail + testar fluxo completo de cadastro/verificação
-- [ ] Página `/planos` (estrutura visual, sem billing real ainda)
+- [x] SMTP configurado — Hostinger noreply@demandoo.net (smtp.hostinger.com:465, SSL)
+- [x] Google OAuth + criação de senha: fluxo `sendDefinePasswordEmail` implementado
+- [x] Auth.js v5: erros de login via `?error=` na URL (mensagens em PT-BR no LoginForm)
+- [x] Captura manual completa com todos os campos
 - [ ] Página `/configuracoes` (perfil: nome, e-mail, senha)
+- [ ] Página `/planos` (estrutura visual, sem billing real ainda)
 
 ### Sprint seguinte
 - [ ] Exportação de dados (LGPD)

@@ -57,6 +57,7 @@ model User {
   passwordHash  String?   @db.VarChar(255)
   role          UserRole  @default(USER)
   active        Boolean   @default(true)
+  avatarUrl     String?   @db.VarChar(1000)
   lgpdConsentAt DateTime?
   deletedAt     DateTime?
   createdAt     DateTime  @default(now())

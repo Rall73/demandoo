@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap } from "lucide-react"
+import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap, Settings } from "lucide-react"
 import { signOut } from "next-auth/react"
 
 interface User {
@@ -15,11 +15,12 @@ interface User {
 }
 
 const NAV = [
-  { href: "/app",              label: "Demandas", icon: Inbox,       tipo: "DEMANDA" },
-  { href: "/app?tipo=TAREFA",  label: "Tarefas",  icon: CheckSquare, tipo: "TAREFA" },
-  { href: "/app?tipo=IDEIA",   label: "Ideias",   icon: Lightbulb,   tipo: "IDEIA" },
-  { href: "/app/calendario",   label: "Calendário", icon: Calendar,  tipo: null },
-  { href: "/app/nova",         label: "Nova captura", icon: Plus,    tipo: null },
+  { href: "/app",              label: "Demandas",      icon: Inbox,       tipo: "DEMANDA" },
+  { href: "/app?tipo=TAREFA",  label: "Tarefas",       icon: CheckSquare, tipo: "TAREFA" },
+  { href: "/app?tipo=IDEIA",   label: "Ideias",        icon: Lightbulb,   tipo: "IDEIA" },
+  { href: "/app/calendario",   label: "Calendário",    icon: Calendar,    tipo: null },
+  { href: "/app/nova",         label: "Nova captura",  icon: Plus,        tipo: null },
+  { href: "/configuracoes",    label: "Configurações", icon: Settings,    tipo: null },
 ]
 
 function isActive(pathname: string, currentTipo: string | null, href: string): boolean {

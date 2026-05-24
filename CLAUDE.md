@@ -38,3 +38,13 @@ Stack: Next.js 16 (App Router) + Prisma + MySQL + Auth.js v5 + OpenAI + Cloudina
 - Commit semântico via HEREDOC, arquivos nomeados (nunca `git add -A`)
 - Sem segredos no repo — tudo nas env vars do painel Hostinger
 - Nunca `output: 'standalone'` no next.config — quebra o Passenger
+
+### E-mail transacional (Nodemailer + Hostinger SMTP)
+- SMTP: `smtp.hostinger.com`, porta `465` (SSL, `secure: true`) ou `587` (STARTTLS, `secure: false`)
+- **Senha de e-mail: NUNCA usar caracteres especiais** (`#`, `@`, `!`, `$`, etc.)
+  - `#` em env var é interpretado como comentário → senha truncada → `535 auth failed`
+  - `@` e outros precisam de url-encode em DATABASE_URL mas não em variáveis simples
+  - Use apenas letras, números e `_` ou `-` em senhas de SMTP
+- Transporter Nodemailer: **sempre criado dentro de uma função** (`makeTransporter()`), nunca no nível do módulo — evita cache de env vars antigas
+- Contas Google OAuth (sem `passwordHash`): fluxo "esqueci senha" deve enviar `sendDefinePasswordEmail` (criar senha pela 1ª vez), não reset
+- Auth.js v5 App Router: `redirect: false` é ignorado para `credentials` → erros chegam via `?error=` na URL, nunca via retorno do `signIn()`

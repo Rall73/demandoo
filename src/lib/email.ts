@@ -67,6 +67,29 @@ export async function sendDefinePasswordEmail(email: string, token: string): Pro
   })
 }
 
+/** Envia e-mail de confirmação de troca de endereço. */
+export async function sendEmailChangeEmail(email: string, token: string): Promise<void> {
+  const url = `${APP_URL}/auth/confirmar-email?token=${token}`
+  await makeTransporter().sendMail({
+    from:    FROM,
+    to:      email,
+    subject: "Confirme seu novo e-mail — demandoo",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#7c3aed">Confirmar novo e-mail</h2>
+        <p>Recebemos um pedido para trocar o e-mail da sua conta demandoo. Clique no botão abaixo para confirmar que este é o seu novo endereço:</p>
+        <a href="${url}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0">
+          Confirmar novo e-mail
+        </a>
+        <p style="color:#64748b;font-size:13px">
+          O link expira em 24 horas.<br>
+          Se você não solicitou isso, ignore este e-mail. Seu e-mail atual continua funcionando normalmente.
+        </p>
+      </div>
+    `,
+  })
+}
+
 /** Envia e-mail de reset de senha. */
 export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
   const url = `${APP_URL}/auth/nova-senha?token=${token}`

@@ -108,8 +108,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
 
     // ─── JWT: carrega dados do banco para o token ─────────────────────────────
-    async jwt({ token, user, account }) {
-      // Na primeira autenticação, `user` vem populado
+    async jwt({ token, user, account, trigger, session: updateData }) {
+      // Refresh via useSession().update() — merge dados recebidos no token
+      if (trigger === "update" && updateData) {
+        return { ...token, ...updateData }
+      }
+
+      // Na primeira autenticação, `user` ou `account` vêm populados
       if (user || account) {
         const dbUser = await prisma.user.findUnique({
           where:   { email: token.email! },
@@ -117,13 +122,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })
 
         if (dbUser) {
-          token.id          = String(dbUser.id)
-          token.companyId   = dbUser.companyId
-          token.companyName = dbUser.company.name
-          token.planSlug    = dbUser.company.plan.slug
-          token.aiQuota     = dbUser.company.plan.aiQuota
-          token.aiUsedTotal = dbUser.company.aiUsedTotal
-          token.role        = dbUser.role
+          token.id            = String(dbUser.id)
+          token.avatarUrl     = dbUser.avatarUrl ?? null
+          token.companyId     = dbUser.companyId
+          token.companyName   = dbUser.company.name
+          token.planSlug      = dbUser.company.plan.slug
+          token.planExpiresAt = dbUser.company.planExpiresAt?.toISOString() ?? null
+          token.aiQuota       = dbUser.company.plan.aiQuota
+          token.aiUsedTotal   = dbUser.company.aiUsedTotal
+          token.role          = dbUser.role
         }
       }
       return token
@@ -131,13 +138,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
     // ─── Session: expõe dados do token para o cliente ─────────────────────────
     async session({ session, token }) {
-      session.user.id          = token.id          as string
-      session.user.companyId   = token.companyId   as number
-      session.user.companyName = token.companyName as string
-      session.user.planSlug    = token.planSlug    as string
-      session.user.aiQuota     = token.aiQuota     as number | null
-      session.user.aiUsedTotal = token.aiUsedTotal as number
-      session.user.role        = token.role        as string
+      session.user.id            = token.id            as string
+      session.user.avatarUrl     = token.avatarUrl     as string | null
+      session.user.companyId     = token.companyId     as number
+      session.user.companyName   = token.companyName   as string
+      session.user.planSlug      = token.planSlug      as string
+      session.user.planExpiresAt = token.planExpiresAt as string | null
+      session.user.aiQuota       = token.aiQuota       as number | null
+      session.user.aiUsedTotal   = token.aiUsedTotal   as number
+      session.user.role          = token.role          as string
       return session
     },
   },
