@@ -49,6 +49,7 @@ export async function POST(req: Request) {
     const body      = await req.json()
 
     const {
+      manual,
       audioUrl,
       descricao,
       titulo:    tituloBody,
@@ -64,7 +65,8 @@ export async function POST(req: Request) {
     }
 
     // ─── Controle de quota de IA ───────────────────────────────────────────────
-    const usandoIA = !!(audioUrl || descricao)
+    // manual: true → pula pipeline de IA e não consome quota
+    const usandoIA = !manual && !!(audioUrl || descricao)
     let aiBlocked  = false
 
     if (usandoIA) {
@@ -177,12 +179,15 @@ REGRAS:
     const prioridade = (prioBody    ?? aiResult.prioridade ?? "MEDIA")   as "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
     const acoes      = (aiResult.acoes ?? []) as string[]
 
+    // No modo manual, usa descricao do body diretamente (aiResult está vazio)
+    const descricaoFinal = manual ? (descricao ?? null) : (aiResult.descricao ?? descricao ?? null)
+
     const demanda = await prisma.demanda.create({
       data: {
         companyId,
         userId,
         titulo:           titulo.slice(0, 500),
-        descricao:        aiResult.descricao ?? descricao ?? null,
+        descricao:        descricaoFinal,
         tipo,
         prioridade,
         prazo,
