@@ -60,6 +60,39 @@ accounts / sessions / verification_tokens  (Auth.js)
 - `companyId` em toda tabela de domínio (isolamento de tenant)
 - Fuso horário: servidor UTC, lógica de "hoje" sempre em BRT via `src/lib/date.ts`
 
+### Dados de referência — tabela `plans` (seed inicial + evolução)
+
+| id | slug | name | priceCents | aiQuota | maxUsers | Observação |
+|---|---|---|---|---|---|---|
+| 1 | `free` | Gratuito | 0 | 20 | 1 | Default no cadastro — `planId: 1` hardcoded no código |
+| 2 | `pro` | Profissional | 1990 | NULL (ilimitado) | 1 | Slug legado — será substituído por `basic` |
+| 3 | `team` | Equipe | 4990 | NULL (ilimitado) | 5 | Slug legado — será substituído por `complete` |
+| 4 | `trial` | Trial | 0 | 100 | 5 | A inserir: período de teste com `planExpiresAt` |
+| 5 | `basic` | Básico | 4900 | 200 | 5 | A inserir: substitui `pro` |
+| 6 | `complete` | Completo | 9900 | 500 | 20 | A inserir: substitui `team` |
+
+**SQL de migração dos planos (rodar no phpMyAdmin dev e produção):**
+```sql
+-- 1. Atualizar o plano free (já existe com id=1, só ajustar quota)
+UPDATE plans SET name='Gratuito', aiQuota=20, maxUsers=1 WHERE slug='free';
+
+-- 2. Inserir novos planos (trial, basic, complete)
+INSERT INTO plans (slug, name, priceCents, aiQuota, maxUsers, active) VALUES
+  ('trial',    'Trial',     0,    100,  5,  1),
+  ('basic',    'Básico',  4900,   200,  5,  1),
+  ('complete', 'Completo', 9900,  500, 20,  1);
+
+-- Obs: slugs legados 'pro' e 'team' permanecem para não quebrar dados
+-- existentes. Serão descontinuados quando billing for implementado.
+```
+
+**SQL da coluna nova (avatarUrl — sprint configurações):**
+```sql
+ALTER TABLE `users` ADD COLUMN `avatarUrl` VARCHAR(1000) NULL;
+```
+
+> ⚠️ Rodar nos dois bancos: `u822347350_demandoo_dev` (dev) e `u822347350_bd_demandoo` (produção)
+
 ---
 
 ## 4. Módulos Implementados
@@ -283,7 +316,8 @@ npx tsc --noEmit && npx next build && git push origin main
 - [x] Google OAuth + criação de senha: fluxo `sendDefinePasswordEmail` implementado
 - [x] Auth.js v5: erros de login via `?error=` na URL (mensagens em PT-BR no LoginForm)
 - [x] Captura manual completa com todos os campos
-- [ ] Página `/configuracoes` (perfil: nome, e-mail, senha)
+- [x] Página `/configuracoes`: perfil (nome + avatar Cloudinary), troca de e-mail com verificação, troca/criação de senha, card de plano com quota e countdown de trial
+- [x] SQL pendente no banco: `avatarUrl` em users + novos slugs de plano (ver seção 3)
 - [ ] Página `/planos` (estrutura visual, sem billing real ainda)
 
 ### Sprint seguinte
