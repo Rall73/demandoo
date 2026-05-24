@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Calendar, Mic, AlertTriangle } from "lucide-react"
 import DetalheActions from "./DetalheActions"
+import DetalheContent from "./DetalheContent"
 
 const STATUS_LABEL: Record<string, string> = {
   ABERTA:       "Aberta",
@@ -29,16 +30,6 @@ const PRIO_COLOR: Record<string, string> = {
   ALTA:    "bg-orange-100 text-orange-700",
   CRITICA: "bg-red-100 text-red-700",
 }
-const TIPO_LABEL: Record<string, string> = {
-  DEMANDA: "Demanda",
-  TAREFA:  "Tarefa",
-  IDEIA:   "Ideia",
-}
-const TIPO_COLOR: Record<string, string> = {
-  DEMANDA: "bg-violet-100 text-violet-700",
-  TAREFA:  "bg-emerald-100 text-emerald-700",
-  IDEIA:   "bg-amber-100 text-amber-700",
-}
 
 export default async function DetalhePage({
   params,
@@ -57,24 +48,21 @@ export default async function DetalhePage({
 
   if (!demanda) notFound()
 
-  // Prazo vencido: prazo existe, é passado e status ainda é ativo
-  const agora    = new Date()
-  const vencida  =
+  const agora   = new Date()
+  const vencida =
     !!demanda.prazo &&
     demanda.prazo < agora &&
     demanda.status !== "CONCLUIDA" &&
     demanda.status !== "CANCELADA"
 
-  // Formata prazo como data local (BRT)
   const prazoStr = demanda.prazo
-    ? new Date(demanda.prazo.getTime() - 3 * 3600000)
-        .toLocaleDateString("pt-BR")
+    ? new Date(demanda.prazo.getTime() - 3 * 3600000).toLocaleDateString("pt-BR")
     : null
 
   return (
     <div className="p-4 md:p-8 max-w-2xl">
 
-      {/* ── Cabeçalho com badges ────────────────────────────────────────────── */}
+      {/* ── Cabeçalho — badges de status/prioridade (atualizados após refresh) ── */}
       <div className="flex items-start gap-3 mb-6">
         <Link
           href="/app"
@@ -83,9 +71,6 @@ export default async function DetalhePage({
           <ArrowLeft size={18} strokeWidth={2} />
         </Link>
         <div className="flex gap-2 flex-wrap">
-          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${TIPO_COLOR[demanda.tipo]}`}>
-            {TIPO_LABEL[demanda.tipo]}
-          </span>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLOR[demanda.status]}`}>
             {STATUS_LABEL[demanda.status]}
           </span>
@@ -101,23 +86,25 @@ export default async function DetalhePage({
         </div>
       </div>
 
-      {/* ── Título e descrição ─────────────────────────────────────────────── */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">
-        <h1 className="text-xl font-bold text-slate-900 mb-3">{demanda.titulo}</h1>
-        {demanda.descricao && (
-          <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
-            {demanda.descricao}
-          </p>
-        )}
-      </div>
+      {/* ── Card principal: tipo (dropdown) + título + descrição + editar detalhes ── */}
+      <DetalheContent
+        demandaId={demanda.id}
+        tipo={demanda.tipo}
+        titulo={demanda.titulo}
+        descricao={demanda.descricao}
+        prioridade={demanda.prioridade}
+        prazo={demanda.prazo?.toISOString() ?? null}
+      />
 
       {/* ── Metadados ──────────────────────────────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4 space-y-3 text-sm">
         <div className="flex gap-2">
           <span className="text-slate-400 w-28 shrink-0">Criada em</span>
           <span className="text-slate-600">
-            {new Date(demanda.createdAt.getTime() - 3 * 3600000)
-              .toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+            {new Date(demanda.createdAt.getTime() - 3 * 3600000).toLocaleDateString("pt-BR", {
+              day: "2-digit", month: "short", year: "numeric",
+              hour: "2-digit", minute: "2-digit",
+            })}
           </span>
         </div>
 
@@ -134,17 +121,15 @@ export default async function DetalhePage({
             <span className={`font-medium flex items-center gap-1.5 ${vencida ? "text-red-600" : "text-slate-800"}`}>
               <Calendar size={13} strokeWidth={2} className={vencida ? "text-red-500" : "text-violet-500"} />
               {prazoStr}
-              {vencida && <span className="text-red-500 text-xs">(vencido)</span>}
+              {vencida && <span className="text-red-500 text-xs font-normal">(vencido)</span>}
             </span>
-            {!vencida && (
-              <a
-                href={`/api/demandas/${demanda.id}/calendar.ics`}
-                download
-                className="text-xs text-violet-600 hover:underline"
-              >
-                + Calendário
-              </a>
-            )}
+            <a
+              href={`/api/demandas/${demanda.id}/calendar.ics`}
+              download
+              className="text-xs text-violet-600 hover:underline"
+            >
+              + Calendário
+            </a>
           </div>
         )}
 
@@ -158,15 +143,15 @@ export default async function DetalhePage({
         )}
       </div>
 
-      {/* ── Ações (sub-checklist) ──────────────────────────────────────────── */}
+      {/* ── Ações (sub-checklist estático — só leitura aqui) ────────────────── */}
       {demanda.acoes.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-semibold text-slate-700">Próximas ações</p>
             <span className={`text-xs font-medium ${
-              demanda.acoes.every(a => a.feita) ? "text-emerald-600" : "text-slate-400"
+              demanda.acoes.every((a) => a.feita) ? "text-emerald-600" : "text-slate-400"
             }`}>
-              {demanda.acoes.filter(a => a.feita).length}/{demanda.acoes.length}
+              {demanda.acoes.filter((a) => a.feita).length}/{demanda.acoes.length}
             </span>
           </div>
           <div className="space-y-2">
@@ -186,7 +171,7 @@ export default async function DetalhePage({
         </div>
       )}
 
-      {/* ── Ações interativas (client) ─────────────────────────────────────── */}
+      {/* ── Transições de status + exclusão (client) ───────────────────────── */}
       <DetalheActions
         demandaId={demanda.id}
         status={demanda.status}
