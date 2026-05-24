@@ -1,0 +1,293 @@
+# demandoo — Pipeline de Desenvolvimento
+
+> Documento vivo de acompanhamento do projeto.
+> Atualizado a cada ciclo de desenvolvimento.
+> **Última atualização:** 2026-05-24
+
+---
+
+## 1. Visão do Produto
+
+**demandoo.net** é um SaaS standalone de captura e gestão de demandas, tarefas e ideias com inteligência artificial.
+
+### Problema que resolve
+Profissionais e equipes perdem demandas recebidas por WhatsApp, reuniões, e-mail e conversas informais. Sem um sistema central de captura, itens se perdem, prazos são esquecidos e a delegação fica informal.
+
+### Proposta de valor
+- **Captura rápida** por voz ou texto livre — a IA estrutura automaticamente
+- **Organização em três trilhos**: Demandas (solicitações externas), Tarefas (próprias) e Ideias
+- **Gestão leve**: status, prioridade, prazo, delegação, próximas ações
+- **Multi-tenant**: cada empresa tem seu ambiente isolado
+
+### Modelo de negócio
+Planos por empresa (tenant). Plano free com quota de IA limitada; planos pagos com quota maior e mais usuários.
+
+---
+
+## 2. Stack Técnica
+
+| Camada | Tecnologia |
+|---|---|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Linguagem | TypeScript |
+| Banco de dados | MySQL (Hostinger) |
+| ORM | Prisma |
+| Autenticação | Auth.js v5 (Credentials + Google OAuth) |
+| IA — transcrição | OpenAI Whisper-1 |
+| IA — estruturação | OpenAI GPT-4o-mini |
+| Upload de áudio | Cloudinary |
+| E-mail transacional | Nodemailer + Gmail SMTP (App Password) |
+| Estilização | Tailwind CSS |
+| Ícones | lucide-react |
+| Deploy | Hostinger (Node.js Passenger) |
+| Ambiente local | `.env.local` → banco dev separado (`demandoo_dev`) |
+
+---
+
+## 3. Arquitetura do Banco de Dados
+
+```
+plans
+  └── companies (tenant)
+        └── users
+              └── demandas
+                    └── acoes_demanda
+accounts / sessions / verification_tokens  (Auth.js)
+```
+
+### Convenções aplicadas
+- Soft delete em todas as entidades de domínio (`deletedAt`, `deletedBy`)
+- `companyId` em toda tabela de domínio (isolamento de tenant)
+- Fuso horário: servidor UTC, lógica de "hoje" sempre em BRT via `src/lib/date.ts`
+
+---
+
+## 4. Módulos Implementados
+
+### ✅ 4.1 Autenticação
+
+| Item | Arquivo | Status |
+|---|---|---|
+| Login e-mail + senha | `src/app/auth/login/` | ✅ |
+| Login com Google OAuth | `src/auth/index.ts` | ✅ |
+| Cadastro com criação automática de empresa | `src/app/api/auth/cadastro/route.ts` | ✅ |
+| Verificação de e-mail (token 24h) | `src/app/auth/verificar/` | ✅ |
+| Esqueci minha senha (token 1h) | `src/app/auth/esqueci-senha/` | ✅ |
+| Redefinição de senha | `src/app/auth/nova-senha/` | ✅ |
+| Bloqueio de conta inativa / empresa suspensa | `src/auth/index.ts` | ✅ |
+| LGPD consent no cadastro (`lgpdConsentAt`) | `src/app/api/auth/cadastro/route.ts` | ✅ |
+| Google: criação automática de empresa no 1º acesso | `src/auth/index.ts` | ✅ |
+
+### ✅ 4.2 Layout e Navegação
+
+| Item | Arquivo | Status |
+|---|---|---|
+| Sidebar desktop (violet-950) | `src/components/Sidebar.tsx` | ✅ |
+| Drawer mobile (menu hamburguer) | `src/components/Sidebar.tsx` | ✅ |
+| Badge de quota de IA na sidebar | `src/components/Sidebar.tsx` | ✅ |
+| Proteção de rota (redirect → login) | `src/app/(app)/layout.tsx` | ✅ |
+
+### ✅ 4.3 Dashboard Principal (`/app`)
+
+| Item | Status |
+|---|---|
+| Abas: Demandas / Tarefas / Ideias | ✅ |
+| KPIs por tipo (4 cards por aba) | ✅ |
+| Lista com filtro de status + prioridade + busca textual | ✅ |
+| Modo card (Demandas/Ideias) com badges de status, prioridade, prazo, ações | ✅ |
+| Modo checklist (Tarefas) com toggle ABERTA ↔ CONCLUÍDA com 1 clique | ✅ |
+| Badge "IA" nos cards quando `aiProcessado = true` | ✅ |
+| Banner de quota de IA (aviso quando ≤ 30% restante) | ✅ |
+| Empty state por tipo | ✅ |
+
+### ✅ 4.4 Captura (`/app/nova`)
+
+| Modo | Campos | Status |
+|---|---|---|
+| **Voz** | Grava áudio → Whisper transcreve → GPT estrutura | ✅ |
+| **Texto + IA** | Texto livre → GPT estrutura (título, tipo, prioridade, prazo, ações, solicitante) | ✅ |
+| **Manual** | Título, descrição, tipo, prioridade, prazo, solicitante, delegado, próximas ações | ✅ |
+
+**Pipeline de IA (voz e texto):**
+1. Upload do áudio para Cloudinary
+2. Transcrição via Whisper-1
+3. Estruturação via GPT-4o-mini (JSON: título, descrição, tipo, prioridade, prazo, ações, solicitante)
+4. Resolução de prazo relativo (BRT) via `parseDateBRT()`
+5. Match de solicitante com usuário da empresa (por primeiro nome)
+6. Criação da demanda + ações em transação
+
+**Controle de quota:**
+- Plano free: `aiQuota` fixo
+- Cada captura com IA incrementa `company.aiUsedTotal`
+- Quando `aiUsedTotal >= aiQuota`: IA bloqueada, modo manual liberado
+
+### ✅ 4.5 Detalhe da Demanda (`/app/[id]`)
+
+| Item | Status |
+|---|---|
+| Badges de status + prioridade + IA + prazo vencido | ✅ |
+| Dropdown inline para trocar tipo | ✅ |
+| Edição inline de título (clique para editar) | ✅ |
+| Edição inline de descrição (clique para editar) | ✅ |
+| Painel "Editar detalhes" (collapse): prioridade, prazo, delegado | ✅ |
+| Metadados: criado em, concluído em + duração, solicitante, delegado, prazo, áudio | ✅ |
+| Checklist de próximas ações (toggle feita, edição inline, soft delete, adicionar) | ✅ |
+| Transições de status contextuais (Iniciar, Concluir, Cancelar, Reabrir) | ✅ |
+| `concluidoAt` registrado ao concluir, limpo ao reabrir | ✅ |
+| Soft delete com confirmação inline | ✅ |
+| Export `.ics` (Google Calendar / Apple Calendar) | ✅ |
+
+### ✅ 4.6 Calendário (`/app/calendario`)
+
+| Item | Status |
+|---|---|
+| Grid mensal com demandas com prazo | ✅ |
+| Navegação entre meses | ✅ |
+| Badges coloridos por tipo (violet/emerald/amber) | ✅ |
+| Data calculada em BRT | ✅ |
+
+### ✅ 4.7 API REST
+
+| Endpoint | Métodos | Status |
+|---|---|---|
+| `/api/demandas` | GET, POST | ✅ |
+| `/api/demandas/[id]` | GET, PATCH, DELETE | ✅ |
+| `/api/demandas/[id]/acoes` | POST | ✅ |
+| `/api/demandas/[id]/acoes/[acaoId]` | PATCH, DELETE | ✅ |
+| `/api/demandas/[id]/calendar.ics` | GET | ✅ |
+| `/api/upload/audio` | POST | ✅ |
+| `/api/auth/cadastro` | POST | ✅ |
+| `/api/auth/esqueci-senha` | POST | ✅ |
+| `/api/auth/nova-senha` | POST | ✅ |
+
+---
+
+## 5. Ambiente de Desenvolvimento
+
+| Ambiente | Banco | URL |
+|---|---|---|
+| **Local** | `u822347350_demandoo_dev` (Hostinger) | `localhost:3000` |
+| **Produção** | `u822347350_bd_demandoo` (Hostinger) | `demandoo.net` |
+
+**Variáveis de ambiente:**
+- `.env` → placeholders apenas (commitado, sem segredos)
+- `.env.local` → valores reais locais (gitignored)
+- Produção → painel Hostinger → Advanced → Environment Variables
+
+**Portão pré-push:**
+```bash
+npx tsc --noEmit && npx next build && git push origin main
+```
+
+---
+
+## 6. Backlog — O Que Ainda Será Criado
+
+### 🔲 6.1 Planos e Billing
+
+| Item | Prioridade | Observações |
+|---|---|---|
+| Página `/planos` (já referenciada na sidebar) | Alta | Exibe planos free/paid, CTA de upgrade |
+| Integração com gateway de pagamento | Alta | Stripe ou Pagar.me |
+| Webhook de pagamento → atualiza `planId` e `planExpiresAt` | Alta | |
+| Controle de expiração de plano | Média | Banner de aviso + bloqueio suave |
+
+### 🔲 6.2 Configurações da Conta
+
+| Item | Prioridade | Observações |
+|---|---|---|
+| Página `/configuracoes` (perfil do usuário) | Alta | Nome, e-mail, senha, foto |
+| Página `/configuracoes/empresa` | Alta | Nome, logo, slug da empresa |
+| Exportação de dados pessoais (LGPD) | Alta | Obrigação legal — gera ZIP com todos os dados |
+| Exclusão de conta (LGPD) | Alta | Soft delete + limpeza de dados pessoais |
+
+### 🔲 6.3 Multi-usuário por Empresa
+
+| Item | Prioridade | Observações |
+|---|---|---|
+| Convidar membros da equipe (por e-mail) | Alta | Gera token de convite |
+| Gestão de membros (listar, remover, alterar role) | Alta | ADMIN vs USER |
+| Demandas delegadas para outros usuários da empresa | Média | Hoje `delegadoNome` é texto livre; futuro: vincular ao `userId` |
+| Visão de equipe: demandas de todos os membros (ADMIN) | Média | Filtro por `userId` no dashboard |
+
+### 🔲 6.4 Notificações e Lembretes
+
+| Item | Prioridade | Observações |
+|---|---|---|
+| E-mail de lembrete de prazo (D-1 e D0) | Alta | Cron job ou queue |
+| Notificação de nova demanda delegada | Média | E-mail para o delegado |
+| Notificação de demanda concluída | Baixa | E-mail para o solicitante |
+| Notificações in-app (badge na sidebar) | Média | Tabela `notifications` |
+
+### 🔲 6.5 Relatórios e Analytics
+
+| Item | Prioridade | Observações |
+|---|---|---|
+| Página `/relatorios` | Média | |
+| Gráfico de demandas por status ao longo do tempo | Média | |
+| Tempo médio de resolução por tipo | Média | Usa `concluidoAt - createdAt` |
+| Ranking de solicitantes (quem mais demanda) | Baixa | |
+| Export CSV da lista de demandas | Média | Filtros aplicados → CSV |
+
+### 🔲 6.6 Melhorias de UX
+
+| Item | Prioridade | Observações |
+|---|---|---|
+| Paginação ou scroll infinito na lista (hoje limit 100) | Média | |
+| Ordenação customizada na lista (colunas clicáveis) | Média | |
+| Arquivar demandas concluídas (ocultar por padrão) | Média | |
+| Busca global (ctrl+K) com resultados em tempo real | Baixa | |
+| Drag & drop para reordenar ações da demanda | Baixa | |
+| Atalhos de teclado no detalhe (S para salvar, etc.) | Baixa | |
+
+### 🔲 6.7 Integrações
+
+| Item | Prioridade | Observações |
+|---|---|---|
+| Webhook de saída (notificar sistema externo quando status muda) | Baixa | |
+| API pública com autenticação por token | Baixa | Permite integração Zapier/n8n |
+| Captura via e-mail (endereço único por empresa) | Baixa | Recebe e-mail → cria demanda |
+
+---
+
+## 7. Débitos Técnicos
+
+| Item | Impacto | Observações |
+|---|---|---|
+| SMTP: App Password Gmail necessário | 🔴 Crítico | Sem isso, verificação de e-mail e reset de senha não funcionam |
+| `.env` tinha segredos commitados | 🟡 Resolvido | Corrigido em 2026-05-24 — agora só placeholders |
+| `delegadoNome` ainda é texto livre | 🟡 Médio | Não vincula ao `users.id`; melhorar quando multi-usuário chegar |
+| Queries sem paginação (take: 100) | 🟡 Médio | OK para MVP; escalar quando base crescer |
+| `new Date()` cru em `DetalheActions.tsx` (só para log, não salvo) | 🟢 Baixo | Não impacta dados |
+
+---
+
+## 8. Histórico de Versões
+
+| Data | Versão | O que foi entregue |
+|---|---|---|
+| 2026-05-?? | v0.1 | Estrutura inicial: auth, schema, dashboard, captura voz + IA |
+| 2026-05-?? | v0.2 | Calendário, export .ics, modo texto + IA, filtros na lista |
+| 2026-05-24 | v0.3 | Group 3: aiProcessado badge, concluidoAt + duração, delegadoNome, AcoesInterativas interativo |
+| 2026-05-24 | v0.4 | Captura manual completa: prioridade, prazo, solicitante, delegado, ações inline |
+| 2026-05-24 | —    | Segurança: `.env` limpo de segredos; doc de pipeline criado |
+
+---
+
+## 9. Próximas Entregas Planejadas
+
+> Atualizar esta seção a cada sprint.
+
+### Sprint atual
+- [ ] Configurar App Password Gmail + testar fluxo completo de cadastro/verificação
+- [ ] Página `/planos` (estrutura visual, sem billing real ainda)
+- [ ] Página `/configuracoes` (perfil: nome, e-mail, senha)
+
+### Sprint seguinte
+- [ ] Exportação de dados (LGPD)
+- [ ] Convite de membros da equipe
+- [ ] E-mail de lembrete de prazo (D-1)
+
+---
+
+*Este documento é mantido manualmente. Atualize sempre que uma entrega for concluída ou um novo item for identificado.*
