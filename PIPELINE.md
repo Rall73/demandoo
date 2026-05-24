@@ -60,35 +60,35 @@ accounts / sessions / verification_tokens  (Auth.js)
 - `companyId` em toda tabela de domínio (isolamento de tenant)
 - Fuso horário: servidor UTC, lógica de "hoje" sempre em BRT via `src/lib/date.ts`
 
-### Dados de referência — tabela `plans` (seed inicial + evolução)
+### Dados de referência — tabela `plans` (estado atual)
 
-| id | slug | name | priceCents | aiQuota | maxUsers | Observação |
-|---|---|---|---|---|---|---|
-| 1 | `free` | Gratuito | 0 | 20 | 1 | Default no cadastro — `planId: 1` hardcoded no código |
-| 2 | `pro` | Profissional | 1990 | NULL (ilimitado) | 1 | Slug legado — será substituído por `basic` |
-| 3 | `team` | Equipe | 4990 | NULL (ilimitado) | 5 | Slug legado — será substituído por `complete` |
-| 4 | `trial` | Trial | 0 | 100 | 5 | A inserir: período de teste com `planExpiresAt` |
-| 5 | `basic` | Básico | 4900 | 200 | 5 | A inserir: substitui `pro` |
-| 6 | `complete` | Completo | 9900 | 500 | 20 | A inserir: substitui `team` |
+| id | slug | name | priceCents | aiQuota | maxUsers | Tipo | Observação |
+|---|---|---|---|---|---|---|---|
+| 1 | `free` | Gratuito | 0 | 20 | 1 | Individual | Default no cadastro — `planId: 1` hardcoded |
+| 2 | `pro` | Profissional | 1990 | NULL | 1 | Legado | Slug antigo, mantido para não quebrar dados |
+| 3 | `team` | Equipe | 4990 | NULL | 5 | Legado | Slug antigo, mantido para não quebrar dados |
+| 4 | `trial` | Trial | 0 | 100 | 5 | Especial | Período de teste — usa `planExpiresAt` |
+| 5 | `basic` | Básico | placeholder | 200 | 1 | Individual | Plano pago individual básico |
+| 6 | `complete` | Completo | placeholder | 500 | 1 | Individual | Plano pago individual completo |
+| 7 | `basic_equipe` | Básico Equipe | placeholder | 500 | 5 | Equipe | Plano pago para equipes pequenas |
+| 8 | `complete_equipe` | Completo Equipe | placeholder | 1500 | 20 | Equipe | Plano pago para equipes grandes |
 
-**SQL de migração dos planos (rodar no phpMyAdmin dev e produção):**
+> Preços (`priceCents`) são placeholders — ajustar via phpMyAdmin quando billing for definido.
+
+**SQL para inserir `basic_equipe` e `complete_equipe` (rodar no phpMyAdmin dev e produção):**
 ```sql
--- 1. Atualizar o plano free (já existe com id=1, só ajustar quota)
-UPDATE plans SET name='Gratuito', aiQuota=20, maxUsers=1 WHERE slug='free';
+-- Atualizar basic e complete para maxUsers=1 (individuais)
+UPDATE plans SET maxUsers=1 WHERE slug IN ('basic', 'complete');
 
--- 2. Inserir novos planos (trial, basic, complete)
+-- Inserir planos de equipe
 INSERT INTO plans (slug, name, priceCents, aiQuota, maxUsers, active) VALUES
-  ('trial',    'Trial',     0,    100,  5,  1),
-  ('basic',    'Básico',  4900,   200,  5,  1),
-  ('complete', 'Completo', 9900,  500, 20,  1);
-
--- Obs: slugs legados 'pro' e 'team' permanecem para não quebrar dados
--- existentes. Serão descontinuados quando billing for implementado.
+  ('basic_equipe',    'Básico Equipe',    14900,  500, 5,  1),
+  ('complete_equipe', 'Completo Equipe',  29900, 1500, 20, 1);
 ```
 
 **SQL da coluna nova (avatarUrl — sprint configurações):**
 ```sql
-ALTER TABLE `users` ADD COLUMN `avatarUrl` VARCHAR(1000) NULL;
+ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatarUrl` VARCHAR(1000) NULL;
 ```
 
 > ⚠️ Rodar nos dois bancos: `u822347350_demandoo_dev` (dev) e `u822347350_bd_demandoo` (produção)
