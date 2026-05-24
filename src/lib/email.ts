@@ -118,6 +118,46 @@ export async function sendInviteEmail(
   })
 }
 
+/** Envia lembrete de prazo (D-1 ou D-0). */
+export async function sendLembreteEmail(
+  email:     string,
+  userName:  string,
+  titulo:    string,
+  demandaId: number,
+  tipo:      "D-1" | "D-0"
+): Promise<void> {
+  const url     = `${APP_URL}/app/${demandaId}`
+  const isHoje  = tipo === "D-0"
+  const subject = isHoje
+    ? `🔴 Prazo hoje: ${titulo}`
+    : `🟡 Prazo amanhã: ${titulo}`
+  const mensagem = isHoje
+    ? "O prazo desta demanda <strong>vence hoje</strong>."
+    : "O prazo desta demanda <strong>vence amanhã</strong>."
+
+  await makeTransporter().sendMail({
+    from:    FROM,
+    to:      email,
+    subject,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#7c3aed">Lembrete de prazo</h2>
+        <p>Olá, ${userName}!</p>
+        <p>${mensagem}</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0">
+          <p style="margin:0;font-weight:600;color:#1e293b">${titulo}</p>
+        </div>
+        <a href="${url}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
+          Ver demanda
+        </a>
+        <p style="color:#64748b;font-size:13px;margin-top:16px">
+          Você está recebendo este e-mail porque tem uma demanda com prazo próximo no demandoo.
+        </p>
+      </div>
+    `,
+  })
+}
+
 /** Envia e-mail de reset de senha. */
 export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
   const url = `${APP_URL}/auth/nova-senha?token=${token}`

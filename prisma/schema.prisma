@@ -157,9 +157,11 @@ model Demanda {
   delegadoNome      String?           @db.VarChar(200)
   audioUrl          String?           @db.VarChar(1000)
   aiProcessado      Boolean           @default(false)
-  concluidoAt       DateTime?
-  deletedAt         DateTime?
-  deletedBy         Int?
+  concluidoAt          DateTime?
+  lembreteD1EnviadoAt  DateTime?
+  lembreteD0EnviadoAt  DateTime?
+  deletedAt            DateTime?
+  deletedBy            Int?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
