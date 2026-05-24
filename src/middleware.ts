@@ -17,10 +17,11 @@ const PUBLIC_PATHS = [
 export default auth((req: NextRequest & { auth: { user?: { id?: string } } | null }) => {
   const { pathname } = req.nextUrl
 
-  // Permite assets estáticos e rotas de API de auth
+  // Permite assets estáticos, rotas de API de auth e cron jobs
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/cron") ||
     pathname.startsWith("/favicon") ||
     pathname.match(/\.(png|jpg|svg|ico|webp|woff2?)$/)
   ) {
