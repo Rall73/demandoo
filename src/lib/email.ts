@@ -1,22 +1,28 @@
 import nodemailer from "nodemailer"
 
-const transporter = nodemailer.createTransport({
-  host:   process.env.SMTP_HOST,
-  port:   Number(process.env.SMTP_PORT ?? 587),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-})
-
-const FROM = process.env.EMAIL_FROM ?? "demandoo <noreply@demandoo.net>"
+const FROM    = process.env.EMAIL_FROM    ?? "demandoo <noreply@demandoo.net>"
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://demandoo.net"
+
+/** Cria um transporter fresco a cada envio, garantindo uso das env vars atuais. */
+function makeTransporter() {
+  return nodemailer.createTransport({
+    host:   process.env.SMTP_HOST ?? "smtp.gmail.com",
+    port:   Number(process.env.SMTP_PORT ?? 587),
+    secure: false, // STARTTLS
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  })
+}
 
 /** Envia e-mail de verificação de conta. */
 export async function sendVerificationEmail(email: string, token: string): Promise<void> {
   const url = `${APP_URL}/auth/verificar?token=${token}`
-  await transporter.sendMail({
+  await makeTransporter().sendMail({
     from:    FROM,
     to:      email,
     subject: "Confirme seu e-mail — demandoo",
@@ -39,7 +45,7 @@ export async function sendVerificationEmail(email: string, token: string): Promi
 /** Envia e-mail de reset de senha. */
 export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
   const url = `${APP_URL}/auth/nova-senha?token=${token}`
-  await transporter.sendMail({
+  await makeTransporter().sendMail({
     from:    FROM,
     to:      email,
     subject: "Redefinição de senha — demandoo",

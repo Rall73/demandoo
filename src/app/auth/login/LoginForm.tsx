@@ -2,21 +2,32 @@
 
 import { useState } from "react"
 import { signIn } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Inbox, Eye, EyeOff, Loader2 } from "lucide-react"
 
 export default function LoginForm() {
-  const router       = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl  = searchParams.get("callbackUrl") ?? "/app"
+
+  // Auth.js v5 redireciona para ?error=... em vez de retornar no redirect:false
+  const errorParam = searchParams.get("error")
+  const AUTH_ERRORS: Record<string, string> = {
+    CredentialsSignin:    "E-mail ou senha incorretos.",
+    EMAIL_NOT_VERIFIED:   "Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.",
+    ACCOUNT_INACTIVE:     "Conta inativa. Entre em contato com o suporte.",
+    COMPANY_SUSPENDED:    "Conta suspensa. Entre em contato com o suporte.",
+    OAuthAccountNotLinked:"Este e-mail já está cadastrado com outro método de login.",
+  }
 
   const [email,      setEmail]      = useState("")
   const [password,   setPassword]   = useState("")
   const [showPass,   setShowPass]   = useState(false)
   const [loading,    setLoading]    = useState(false)
   const [loadingGoogle, setLoadingGoogle] = useState(false)
-  const [error,      setError]      = useState<string | null>(null)
+  const [error,      setError]      = useState<string | null>(
+    errorParam ? (AUTH_ERRORS[errorParam] ?? "Erro ao entrar. Tente novamente.") : null
+  )
 
   async function handleGoogle() {
     setLoadingGoogle(true)
@@ -28,24 +39,12 @@ export default function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-
-    const res = await signIn("credentials", { email, password, redirect: false })
+    // Auth.js v5 App Router: deixa redirecionar naturalmente.
+    // Em caso de erro, volta para /auth/login?error=CredentialsSignin
+    // e o estado é inicializado a partir do errorParam acima.
+    await signIn("credentials", { email, password, callbackUrl })
+    // Só chega aqui se signIn não redirecionou (improvável) — fallback
     setLoading(false)
-
-    if (!res?.ok) {
-      if (res?.error === "EMAIL_NOT_VERIFIED") {
-        setError("Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.")
-      } else if (res?.error === "ACCOUNT_INACTIVE") {
-        setError("Conta inativa. Entre em contato com o suporte.")
-      } else if (res?.error === "COMPANY_SUSPENDED") {
-        setError("Conta suspensa. Entre em contato com o suporte.")
-      } else {
-        setError("E-mail ou senha incorretos.")
-      }
-      return
-    }
-
-    router.push(callbackUrl)
   }
 
   return (
