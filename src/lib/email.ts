@@ -42,6 +42,29 @@ export async function sendVerificationEmail(email: string, token: string): Promi
   })
 }
 
+/** Envia e-mail para contas Google criarem senha pela 1ª vez. */
+export async function sendDefinePasswordEmail(email: string, token: string): Promise<void> {
+  const url = `${APP_URL}/auth/nova-senha?token=${token}`
+  await makeTransporter().sendMail({
+    from:    FROM,
+    to:      email,
+    subject: "Crie sua senha — demandoo",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#7c3aed">Criar senha no demandoo</h2>
+        <p>Sua conta foi criada com o Google. Você pode criar uma senha para também entrar com e-mail e senha:</p>
+        <a href="${url}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0">
+          Criar minha senha
+        </a>
+        <p style="color:#64748b;font-size:13px">
+          O link expira em 1 hora.<br>
+          Se você não solicitou isso, ignore este e-mail. Seu login com Google continua funcionando normalmente.
+        </p>
+      </div>
+    `,
+  })
+}
+
 /** Envia e-mail de reset de senha. */
 export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
   const url = `${APP_URL}/auth/nova-senha?token=${token}`

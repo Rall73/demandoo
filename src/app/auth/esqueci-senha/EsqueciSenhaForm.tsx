@@ -5,10 +5,11 @@ import Link from "next/link"
 import { Inbox, Loader2, ArrowLeft } from "lucide-react"
 
 export default function EsqueciSenhaForm() {
-  const [email,   setEmail]   = useState("")
-  const [loading, setLoading] = useState(false)
-  const [sent,    setSent]    = useState(false)
-  const [error,   setError]   = useState<string | null>(null)
+  const [email,           setEmail]           = useState("")
+  const [loading,         setLoading]         = useState(false)
+  const [sent,            setSent]            = useState(false)
+  const [isGoogleAccount, setIsGoogleAccount] = useState(false)
+  const [error,           setError]           = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -16,16 +17,17 @@ export default function EsqueciSenhaForm() {
     setError(null)
 
     try {
-      const res = await fetch("/api/auth/esqueci-senha", {
+      const res  = await fetch("/api/auth/esqueci-senha", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ email }),
       })
+      const data = await res.json()
 
       if (!res.ok) {
-        const data = await res.json()
         setError(data.error ?? "Erro ao enviar. Tente novamente.")
       } else {
+        setIsGoogleAccount(data.isGoogleAccount === true)
         setSent(true)
       }
     } catch {
@@ -49,11 +51,33 @@ export default function EsqueciSenhaForm() {
 
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           {sent ? (
-            <div className="text-center py-4 space-y-3">
-              <p className="text-sm text-slate-700">
-                Se existe uma conta com esse e-mail, você receberá um link para redefinir sua senha em instantes.
-              </p>
-              <p className="text-xs text-slate-400">Verifique também a pasta de spam.</p>
+            <div className="py-4 space-y-3">
+              {isGoogleAccount ? (
+                <>
+                  <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                    <svg className="shrink-0 mt-0.5" width="18" height="18" viewBox="0 0 48 48">
+                      <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.5 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/>
+                      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.7 1.1 7.8 2.9l5.7-5.7C34.1 6.5 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/>
+                      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5L31.8 34c-2 1.4-4.6 2-7.8 2-5.2 0-9.6-3.4-11.3-8.1l-6.5 5C9.6 39.5 16.3 44 24 44z"/>
+                      <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.4-2.4 4.4-4.5 5.8l6.7 5.2C41.3 35.3 44 30 44 24c0-1.3-.1-2.7-.4-4z"/>
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">Sua conta usa login com Google</p>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Enviamos um link para você criar uma senha — após isso poderá entrar das duas formas: Google ou e-mail e senha.
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400 text-center">Verifique também a pasta de spam.</p>
+                </>
+              ) : (
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-slate-700">
+                    Se existe uma conta com esse e-mail, você receberá um link para redefinir sua senha em instantes.
+                  </p>
+                  <p className="text-xs text-slate-400">Verifique também a pasta de spam.</p>
+                </div>
+              )}
             </div>
           ) : (
             <>

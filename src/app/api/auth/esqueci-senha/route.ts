@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { sendPasswordResetEmail } from "@/lib/email"
+import { sendPasswordResetEmail, sendDefinePasswordEmail } from "@/lib/email"
 import crypto from "crypto"
 
 export async function POST(req: Request) {
@@ -13,8 +13,8 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.findUnique({ where: { email } })
 
-    // Resposta idêntica independente de o e-mail existir (evita enumeração)
-    if (!user || !user.passwordHash || user.deletedAt) {
+    // E-mail não existe ou conta deletada → resposta silenciosa (evita enumeração)
+    if (!user || user.deletedAt) {
       return NextResponse.json({ ok: true })
     }
 
@@ -30,8 +30,14 @@ export async function POST(req: Request) {
       data: { identifier: `reset:${email}`, token, expires },
     })
 
-    sendPasswordResetEmail(email, token).catch(console.error)
+    // Conta Google (sem senha): envia e-mail para CRIAR senha pela 1ª vez
+    if (!user.passwordHash) {
+      sendDefinePasswordEmail(email, token).catch(console.error)
+      return NextResponse.json({ ok: true, isGoogleAccount: true })
+    }
 
+    // Conta normal: envia e-mail de reset
+    sendPasswordResetEmail(email, token).catch(console.error)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error("[POST /api/auth/esqueci-senha]", err)
