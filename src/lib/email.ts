@@ -5,10 +5,12 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://demandoo.net"
 
 /** Cria um transporter fresco a cada envio, garantindo uso das env vars atuais. */
 function makeTransporter() {
+  const port   = Number(process.env.SMTP_PORT ?? 587)
+  const secure = port === 465 // SSL para 465, STARTTLS para 587
   return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST ?? "smtp.gmail.com",
-    port:   Number(process.env.SMTP_PORT ?? 587),
-    secure: false, // STARTTLS
+    host: process.env.SMTP_HOST ?? "smtp.hostinger.com",
+    port,
+    secure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
