@@ -278,7 +278,7 @@ demandoo/
 
 ---
 
-## 11. Estado atual do projeto (último commit: c31efe7)
+## 11. Estado atual do projeto (último commit: 501c85c)
 
 ### ✅ Funcionando em produção (demandoo.net):
 - Landing page pública com hero, como funciona, planos, segurança
@@ -286,15 +286,10 @@ demandoo/
 - Tela de login (e-mail + Google)
 - Favicon e Apple icon (gerado via Next.js ImageResponse)
 - PWA manifest (pode ser instalado no celular)
-
-### ⚠️ Blocker principal — DATABASE_URL incorreta:
-A DATABASE_URL no Hostinger ainda usa `bd_demandoo` sem o prefixo.
-**Ação necessária:** Atualizar no painel Hostinger para:
-```
-mysql://u822347350_admin_demandoo:[SENHA]@147.93.39.25:3306/u822347350_bd_demandoo
-```
-*(usar a senha real — nunca comitar no repo)*
-Depois: **Settings and Redeploy** (não só "Update").
+- **Todas as 15 env vars configuradas no Hostinger** (Google OAuth, SMTP, Cloudinary, banco)
+- `/auth/verificar` — confirma token de e-mail (emailVerified setado, token apagado)
+- `/auth/esqueci-senha` — form + API de reset (token 1h, enumeração protegida)
+- `/auth/nova-senha` — form + API que atualiza passwordHash
 
 ### 🔧 Páginas criadas mas dependem do banco:
 - `/app` — lista de demandas (abas Demanda/Tarefa/Ideia)
@@ -303,35 +298,28 @@ Depois: **Settings and Redeploy** (não só "Update").
 - `/app/calendario` — grid mensal
 
 ### ❌ Ainda não implementado (próximas etapas):
-1. **Rota /auth/verificar** — confirma token de e-mail (necessário para login por senha funcionar completamente)
-2. **Rota /auth/esqueci-senha** — reset de senha
-3. **Rota /auth/nova-senha** — nova senha após reset
-4. **Rota /planos** — upgrade de plano (atualmente o link existe mas a página não)
-5. **SMTP configurado** — e-mail de verificação não está sendo enviado (SMTP_USER/SMTP_PASS vazios)
-6. **Google OAuth vars no Hostinger** — GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET precisam ser adicionados
-7. **Endpoint /api/demandas/[id]/calendar.ics** — .ics para download (código não portado ainda)
-8. **Tela de configurações da conta** — exportar dados, excluir conta (LGPD)
-9. **Página /politica-de-privacidade** — link existe no footer mas página não existe
-10. **Página /termos-de-uso** — idem
-11. **Stripe ou gateway de pagamento** — para planos pagos
-12. **Painel admin** — visão de empresas/usuários para o dono do SaaS
+1. **Rota /planos** — upgrade de plano (link existe mas página não)
+2. **Endpoint /api/demandas/[id]/calendar.ics** — .ics para download
+3. **Tela de configurações da conta** — exportar dados, excluir conta (LGPD)
+4. **Página /politica-de-privacidade** — link existe no footer mas página não existe
+5. **Página /termos-de-uso** — idem
+6. **Stripe ou gateway de pagamento** — para planos pagos
+7. **Painel admin** — visão de empresas/usuários para o dono do SaaS
 
 ---
 
 ## 12. Próximos passos imediatos (em ordem de prioridade)
 
-### Prioridade 1 — Fazer o app funcionar completamente
-1. Corrigir DATABASE_URL no Hostinger (prefixo `u822347350_`)
-2. Adicionar GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no Hostinger
-3. Fazer Settings and Redeploy
-4. Implementar /auth/verificar (confirma token de e-mail)
-5. Configurar SMTP (Gmail App Password)
+### Prioridade 1 — ✅ Concluído
+1. ✅ DATABASE_URL corrigida no Hostinger
+2. ✅ Todas as 15 env vars configuradas (Google, SMTP, Cloudinary)
+3. ✅ /auth/verificar implementado
+4. ✅ /auth/esqueci-senha + /auth/nova-senha implementados
 
 ### Prioridade 2 — Completar fluxo do usuário
-6. Implementar /auth/esqueci-senha + /auth/nova-senha
-7. Implementar /planos (tela de upgrade)
-8. Implementar /api/demandas/[id]/calendar.ics
-9. Criar páginas legais (/politica-de-privacidade, /termos-de-uso)
+5. Implementar /planos (tela de upgrade)
+6. Implementar /api/demandas/[id]/calendar.ics
+7. Criar páginas legais (/politica-de-privacidade, /termos-de-uso)
 
 ### Prioridade 3 — Qualidade e crescimento
 10. Tela de configurações (exportar dados, excluir conta — LGPD)
@@ -403,4 +391,4 @@ Cole o conteúdo deste arquivo como primeira mensagem na nova conversa.
 
 ---
 
-*Última atualização: commit c31efe7 — páginas Nova, Detalhe, Calendário + SessionProvider*
+*Última atualização: commit 501c85c — fluxo completo de auth por e-mail (verificar, esqueci-senha, nova-senha)*
