@@ -301,9 +301,11 @@ npx tsc --noEmit && npx next build && git push origin main
 |---|---|---|
 | 2026-05-?? | v0.1 | Estrutura inicial: auth, schema, dashboard, captura voz + IA |
 | 2026-05-?? | v0.2 | Calendário, export .ics, modo texto + IA, filtros na lista |
-| 2026-05-24 | v0.3 | Group 3: aiProcessado badge, concluidoAt + duração, delegadoNome, AcoesInterativas interativo |
+| 2026-05-24 | v0.3 | aiProcessado badge, concluidoAt + duração, delegadoNome, AcoesInterativas interativo |
 | 2026-05-24 | v0.4 | Captura manual completa: prioridade, prazo, solicitante, delegado, ações inline |
-| 2026-05-24 | —    | Segurança: `.env` limpo de segredos; doc de pipeline criado |
+| 2026-05-24 | v0.4.1 | Segurança: `.env` limpo de segredos; PIPELINE.md criado |
+| 2026-05-24 | v0.5 | SMTP Hostinger corrigido; Google OAuth → criar senha; login erros PT-BR |
+| 2026-05-24 | v0.6 | Página `/configuracoes`: perfil, avatar, troca de e-mail c/ verificação, senha, plano |
 
 ---
 
@@ -312,18 +314,12 @@ npx tsc --noEmit && npx next build && git push origin main
 > Atualizar esta seção a cada sprint.
 
 ### Sprint atual
-- [x] SMTP configurado — Hostinger noreply@demandoo.net (smtp.hostinger.com:465, SSL)
-- [x] Google OAuth + criação de senha: fluxo `sendDefinePasswordEmail` implementado
-- [x] Auth.js v5: erros de login via `?error=` na URL (mensagens em PT-BR no LoginForm)
-- [x] Captura manual completa com todos os campos
-- [x] Página `/configuracoes`: perfil (nome + avatar Cloudinary), troca de e-mail com verificação, troca/criação de senha, card de plano com quota e countdown de trial
-- [x] SQL pendente no banco: `avatarUrl` em users + novos slugs de plano (ver seção 3)
 - [ ] Página `/planos` (estrutura visual, sem billing real ainda)
 
-### Sprint seguinte
+### Backlog priorizado
 - [ ] Exportação de dados (LGPD)
-- [ ] Convite de membros da equipe
-- [ ] E-mail de lembrete de prazo (D-1)
+- [ ] Convite de membros da equipe (e-mail + token)
+- [ ] E-mail de lembrete de prazo (D-1 e D0)
 
 ---
 
