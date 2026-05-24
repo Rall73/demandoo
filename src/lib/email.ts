@@ -90,6 +90,34 @@ export async function sendEmailChangeEmail(email: string, token: string): Promis
   })
 }
 
+/** Envia convite para entrar na empresa. */
+export async function sendInviteEmail(
+  email: string,
+  token: string,
+  companyName: string,
+  inviterName: string
+): Promise<void> {
+  const url = `${APP_URL}/auth/convite?token=${token}`
+  await makeTransporter().sendMail({
+    from:    FROM,
+    to:      email,
+    subject: `${inviterName} te convidou para o demandoo`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#7c3aed">Você foi convidado!</h2>
+        <p><strong>${inviterName}</strong> te convidou para entrar na equipe <strong>${companyName}</strong> no demandoo.</p>
+        <a href="${url}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:16px 0">
+          Aceitar convite
+        </a>
+        <p style="color:#64748b;font-size:13px">
+          O link expira em 7 dias.<br>
+          Se você não esperava este convite, pode ignorar este e-mail.
+        </p>
+      </div>
+    `,
+  })
+}
+
 /** Envia e-mail de reset de senha. */
 export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
   const url = `${APP_URL}/auth/nova-senha?token=${token}`

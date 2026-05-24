@@ -11,7 +11,9 @@ export default function LoginForm() {
   const callbackUrl  = searchParams.get("callbackUrl") ?? "/app"
 
   // Auth.js v5 redireciona para ?error=... em vez de retornar no redirect:false
-  const errorParam = searchParams.get("error")
+  const errorParam   = searchParams.get("error")
+  const conviteParam = searchParams.get("convite")
+
   const AUTH_ERRORS: Record<string, string> = {
     CredentialsSignin:    "E-mail ou senha incorretos.",
     EMAIL_NOT_VERIFIED:   "Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.",
@@ -61,6 +63,11 @@ export default function LoginForm() {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+          {conviteParam === "aceito" && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg px-4 py-3">
+              Conta criada com sucesso! Faça login para entrar na sua equipe.
+            </div>
+          )}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
               {error}

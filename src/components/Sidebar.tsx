@@ -3,12 +3,13 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap, Settings } from "lucide-react"
+import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap, Settings, Users } from "lucide-react"
 import { signOut } from "next-auth/react"
 
 interface User {
   name: string
   email: string
+  role: string
   planSlug: string
   aiQuota: number | null
   aiUsedTotal: number
@@ -43,9 +44,16 @@ export default function Sidebar({ user }: { user: User }) {
   const aiRestante   = user.aiQuota !== null ? user.aiQuota - user.aiUsedTotal : null
   const aiBloqueado  = user.aiQuota !== null && user.aiUsedTotal >= user.aiQuota
 
+  const isAdmin = user.role === "ADMIN"
+
+  const navItems = [
+    ...NAV,
+    ...(isAdmin ? [{ href: "/equipe", label: "Equipe", icon: Users, tipo: null }] : []),
+  ]
+
   const NavList = ({ onClick }: { onClick?: () => void }) => (
     <nav className="flex-1 px-2 py-3 space-y-0.5">
-      {NAV.map(({ href, label, icon: Icon }) => {
+      {navItems.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, currentTipo, href)
         return (
           <Link
