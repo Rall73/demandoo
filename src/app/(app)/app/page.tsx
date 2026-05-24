@@ -117,6 +117,7 @@ export default async function AppPage({
     prioridade:      d.prioridade,
     prazo:           d.prazo?.toISOString() ?? null,
     solicitanteNome: d.solicitanteNome,
+    aiProcessado:    d.aiProcessado,
     createdAt:       d.createdAt.toISOString(),
     acoes:           d.acoes.map((a) => ({ id: a.id, feita: a.feita, descricao: a.descricao })),
   }))

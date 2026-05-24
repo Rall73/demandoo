@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   Search, X, CheckCircle2, Clock, PlayCircle, Ban,
-  AlertTriangle, ChevronRight, Inbox, CheckSquare, Lightbulb, Loader2,
+  AlertTriangle, ChevronRight, Inbox, CheckSquare, Lightbulb, Loader2, Sparkles,
 } from "lucide-react"
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -14,16 +14,17 @@ type Status = "ABERTA" | "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA"
 type Prio   = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
 
 export interface DemandaItem {
-  id:             number
-  titulo:         string
-  descricao:      string | null
-  tipo:           Tipo
-  status:         Status
-  prioridade:     Prio
-  prazo:          string | null   // ISO string (serializado pelo server)
+  id:              number
+  titulo:          string
+  descricao:       string | null
+  tipo:            Tipo
+  status:          Status
+  prioridade:      Prio
+  prazo:           string | null   // ISO string (serializado pelo server)
   solicitanteNome: string | null
-  acoes:          { id: number; feita: boolean; descricao: string }[]
-  createdAt:      string
+  aiProcessado:    boolean
+  acoes:           { id: number; feita: boolean; descricao: string }[]
+  createdAt:       string
 }
 
 // ── Constantes visuais ────────────────────────────────────────────────────────
@@ -349,6 +350,14 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
                       {/* Solicitante */}
                       {d.solicitanteNome && (
                         <span className="text-xs text-slate-400">por {d.solicitanteNome}</span>
+                      )}
+
+                      {/* Badge IA */}
+                      {d.aiProcessado && (
+                        <span className="inline-flex items-center gap-0.5 text-xs text-violet-500 font-medium">
+                          <Sparkles size={10} strokeWidth={2} />
+                          IA
+                        </span>
                       )}
                     </div>
                   </div>

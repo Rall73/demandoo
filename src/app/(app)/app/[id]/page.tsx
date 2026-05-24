@@ -2,9 +2,10 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Calendar, Mic, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Calendar, Mic, AlertTriangle, Sparkles, User } from "lucide-react"
 import DetalheActions from "./DetalheActions"
 import DetalheContent from "./DetalheContent"
+import AcoesInterativas from "./AcoesInterativas"
 
 const STATUS_LABEL: Record<string, string> = {
   ABERTA:       "Aberta",
@@ -31,6 +32,16 @@ const PRIO_COLOR: Record<string, string> = {
   CRITICA: "bg-red-100 text-red-700",
 }
 
+// Formata duração em dias/horas entre duas datas
+function duracaoLegivel(de: Date, ate: Date): string {
+  const diffMs   = ate.getTime() - de.getTime()
+  const diffHs   = Math.floor(diffMs / 3600000)
+  const diffDias = Math.floor(diffHs / 24)
+  if (diffDias >= 1) return `${diffDias} dia${diffDias > 1 ? "s" : ""}`
+  if (diffHs   >= 1) return `${diffHs}h`
+  return "< 1h"
+}
+
 export default async function DetalhePage({
   params,
 }: {
@@ -43,7 +54,7 @@ export default async function DetalhePage({
 
   const demanda = await prisma.demanda.findFirst({
     where:   { id: Number(id), companyId, userId, deletedAt: null },
-    include: { acoes: { orderBy: { ordem: "asc" } } },
+    include: { acoes: { where: { deletedAt: null }, orderBy: { ordem: "asc" } } },
   })
 
   if (!demanda) notFound()
@@ -59,10 +70,15 @@ export default async function DetalhePage({
     ? new Date(demanda.prazo.getTime() - 3 * 3600000).toLocaleDateString("pt-BR")
     : null
 
+  const duracaoStr =
+    demanda.concluidoAt && demanda.createdAt
+      ? duracaoLegivel(demanda.createdAt, demanda.concluidoAt)
+      : null
+
   return (
     <div className="p-4 md:p-8 max-w-2xl">
 
-      {/* ── Cabeçalho — badges de status/prioridade (atualizados após refresh) ── */}
+      {/* ── Cabeçalho — badges de status/prioridade ───────────────────────────── */}
       <div className="flex items-start gap-3 mb-6">
         <Link
           href="/app"
@@ -77,6 +93,12 @@ export default async function DetalhePage({
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${PRIO_COLOR[demanda.prioridade]}`}>
             {PRIO_LABEL[demanda.prioridade]}
           </span>
+          {demanda.aiProcessado && (
+            <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-violet-100 text-violet-700">
+              <Sparkles size={11} strokeWidth={2} />
+              IA
+            </span>
+          )}
           {vencida && (
             <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-red-100 text-red-700">
               <AlertTriangle size={11} strokeWidth={2.5} />
@@ -94,9 +116,10 @@ export default async function DetalhePage({
         descricao={demanda.descricao}
         prioridade={demanda.prioridade}
         prazo={demanda.prazo?.toISOString() ?? null}
+        delegadoNome={demanda.delegadoNome ?? null}
       />
 
-      {/* ── Metadados ──────────────────────────────────────────────────────── */}
+      {/* ── Metadados ──────────────────────────────────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4 space-y-3 text-sm">
         <div className="flex gap-2">
           <span className="text-slate-400 w-28 shrink-0">Criada em</span>
@@ -108,10 +131,34 @@ export default async function DetalhePage({
           </span>
         </div>
 
+        {demanda.status === "CONCLUIDA" && demanda.concluidoAt && (
+          <div className="flex gap-2">
+            <span className="text-slate-400 w-28 shrink-0">Concluída em</span>
+            <span className="text-emerald-700 font-medium">
+              {new Date(demanda.concluidoAt.getTime() - 3 * 3600000).toLocaleDateString("pt-BR", {
+                day: "2-digit", month: "short", year: "numeric",
+                hour: "2-digit", minute: "2-digit",
+              })}
+              {duracaoStr && (
+                <span className="text-slate-400 font-normal ml-1.5">({duracaoStr})</span>
+              )}
+            </span>
+          </div>
+        )}
+
         {demanda.solicitanteNome && (
           <div className="flex gap-2">
             <span className="text-slate-400 w-28 shrink-0">Solicitante</span>
             <span className="text-slate-800 font-medium">{demanda.solicitanteNome}</span>
+          </div>
+        )}
+
+        {demanda.delegadoNome && (
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 w-28 shrink-0 flex items-center gap-1">
+              <User size={13} strokeWidth={2} /> Delegado
+            </span>
+            <span className="text-slate-800 font-medium">{demanda.delegadoNome}</span>
           </div>
         )}
 
@@ -143,35 +190,13 @@ export default async function DetalhePage({
         )}
       </div>
 
-      {/* ── Ações (sub-checklist estático — só leitura aqui) ────────────────── */}
-      {demanda.acoes.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-slate-700">Próximas ações</p>
-            <span className={`text-xs font-medium ${
-              demanda.acoes.every((a) => a.feita) ? "text-emerald-600" : "text-slate-400"
-            }`}>
-              {demanda.acoes.filter((a) => a.feita).length}/{demanda.acoes.length}
-            </span>
-          </div>
-          <div className="space-y-2">
-            {demanda.acoes.map((a) => (
-              <div key={a.id} className="flex items-start gap-3">
-                <div className={`mt-0.5 w-4 h-4 rounded shrink-0 flex items-center justify-center border ${
-                  a.feita ? "bg-emerald-500 border-emerald-500" : "border-slate-300"
-                }`}>
-                  {a.feita && <span className="text-white text-[10px] font-bold">✓</span>}
-                </div>
-                <span className={`text-sm leading-snug ${a.feita ? "line-through text-slate-400" : "text-slate-700"}`}>
-                  {a.descricao}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Ações interativas ───────────────────────────────────────────────────── */}
+      <AcoesInterativas
+        demandaId={demanda.id}
+        acoes={demanda.acoes.map((a) => ({ id: a.id, descricao: a.descricao, feita: a.feita }))}
+      />
 
-      {/* ── Transições de status + exclusão (client) ───────────────────────── */}
+      {/* ── Transições de status + exclusão (client) ───────────────────────────── */}
       <DetalheActions
         demandaId={demanda.id}
         status={demanda.status}

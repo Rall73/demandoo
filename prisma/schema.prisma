@@ -153,7 +153,10 @@ model Demanda {
   solicitanteNome   String?           @db.VarChar(200)
   solicitanteUserId Int?
   delegadoUserId    Int?
+  delegadoNome      String?           @db.VarChar(200)
   audioUrl          String?           @db.VarChar(1000)
+  aiProcessado      Boolean           @default(false)
+  concluidoAt       DateTime?
   deletedAt         DateTime?
   deletedBy         Int?
   createdAt         DateTime          @default(now())
@@ -171,12 +174,13 @@ model Demanda {
 }
 
 model AcaoDemanda {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   demandaId Int
-  descricao String   @db.VarChar(1000)
-  feita     Boolean  @default(false)
-  ordem     Int      @default(0)
-  createdAt DateTime @default(now())
+  descricao String    @db.VarChar(1000)
+  feita     Boolean   @default(false)
+  ordem     Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
 
   demanda Demanda @relation(fields: [demandaId], references: [id], onDelete: Cascade)
 

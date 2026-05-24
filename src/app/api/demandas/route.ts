@@ -195,6 +195,7 @@ REGRAS:
         solicitanteUserId,
         delegadoUserId:   delegadoBody ?? null,
         audioUrl:         audioUrl ?? null,
+        aiProcessado:     usandoIA && !aiBlocked,
         acoes: {
           create: acoes.map((desc: string, i: number) => ({ descricao: desc, ordem: i })),
         },

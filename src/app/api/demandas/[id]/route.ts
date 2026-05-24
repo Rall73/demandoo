@@ -32,10 +32,20 @@ export async function PATCH(req: Request, { params }: Ctx) {
     const campos: Record<string, unknown> = {}
     if (body.titulo)     campos.titulo     = body.titulo
     if (body.descricao !== undefined) campos.descricao = body.descricao
-    if (body.status)     campos.status     = body.status
     if (body.prioridade) campos.prioridade = body.prioridade
     if (body.tipo)       campos.tipo       = body.tipo
     if (body.prazo !== undefined) campos.prazo = body.prazo ? new Date(body.prazo + "T03:00:00Z") : null
+    if (body.delegadoNome !== undefined) campos.delegadoNome = body.delegadoNome || null
+
+    // concluidoAt: set when transitioning to CONCLUIDA, clear when reopening
+    if (body.status) {
+      campos.status = body.status
+      if (body.status === "CONCLUIDA") {
+        campos.concluidoAt = new Date()
+      } else if (body.status === "ABERTA" || body.status === "EM_ANDAMENTO" || body.status === "CANCELADA") {
+        campos.concluidoAt = null
+      }
+    }
 
     const demanda = await prisma.demanda.updateMany({
       where: { id: Number(id), companyId: session.user.companyId, deletedAt: null },

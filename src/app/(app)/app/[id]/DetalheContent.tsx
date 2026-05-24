@@ -11,12 +11,13 @@ type Tipo = "DEMANDA" | "TAREFA" | "IDEIA"
 type Prio = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
 
 interface Props {
-  demandaId: number
-  tipo:      Tipo
-  titulo:    string
-  descricao: string | null
-  prioridade: Prio
-  prazo:     string | null  // ISO string ou null
+  demandaId:    number
+  tipo:         Tipo
+  titulo:       string
+  descricao:    string | null
+  prioridade:   Prio
+  prazo:        string | null  // ISO string ou null
+  delegadoNome: string | null
 }
 
 const TIPO_OPTS = [
@@ -41,6 +42,7 @@ function isoToDate(iso: string | null): string {
 export default function DetalheContent({
   demandaId, tipo: tipoInit, titulo: tituloInit,
   descricao: descInit, prioridade: prioInit, prazo: prazoInit,
+  delegadoNome: delegadoInit,
 }: Props) {
   const router = useRouter()
 
@@ -58,8 +60,9 @@ export default function DetalheContent({
   // Valores temporários nos formulários de edição
   const [tmpTitulo, setTmpTitulo] = useState(tituloInit)
   const [tmpDesc,   setTmpDesc]   = useState(descInit ?? "")
-  const [tmpPrio,   setTmpPrio]   = useState<Prio>(prioInit)
-  const [tmpPrazo,  setTmpPrazo]  = useState(isoToDate(prazoInit))
+  const [tmpPrio,      setTmpPrio]      = useState<Prio>(prioInit)
+  const [tmpPrazo,     setTmpPrazo]     = useState(isoToDate(prazoInit))
+  const [tmpDelegado,  setTmpDelegado]  = useState(delegadoInit ?? "")
 
   const [loading, setLoading] = useState(false)
 
@@ -108,12 +111,13 @@ export default function DetalheContent({
     await patch({ tipo: novoTipo })
   }
 
-  // ── Detalhes (tipo + prioridade + prazo) ────────────────────────────────────
+  // ── Detalhes (tipo + prioridade + prazo + delegado) ─────────────────────────
   async function saveDetalhes() {
     await patch({
-      tipo:       tipo,  // tipo já atualizado pelo dropdown ou mantido
-      prioridade: tmpPrio,
-      prazo:      tmpPrazo || null,
+      tipo:         tipo,  // tipo já atualizado pelo dropdown ou mantido
+      prioridade:   tmpPrio,
+      prazo:        tmpPrazo || null,
+      delegadoNome: tmpDelegado.trim() || null,
     })
     setShowDetalhes(false)
   }
@@ -302,6 +306,19 @@ export default function DetalheContent({
                   className="w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
               </div>
+            </div>
+
+            {/* Delegado */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Delegado para</label>
+              <input
+                type="text"
+                value={tmpDelegado}
+                onChange={(e) => setTmpDelegado(e.target.value)}
+                placeholder="Nome de quem vai executar…"
+                maxLength={200}
+                className="w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
             </div>
 
             <button
