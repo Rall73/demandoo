@@ -3,17 +3,28 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Mic, Square, ArrowLeft, Loader2, PenLine, Send, Zap, Sparkles } from "lucide-react"
+import {
+  Mic, Square, ArrowLeft, Loader2, PenLine, Send, Zap, Sparkles,
+  Plus, Trash2, X,
+} from "lucide-react"
 import { useSession } from "next-auth/react"
 
 type Modo = "voz" | "texto" | "manual"
 type Tipo = "DEMANDA" | "TAREFA" | "IDEIA"
+type Prio = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
 
 const TIPO_LABEL: Record<Tipo, string> = {
   DEMANDA: "Demanda",
   TAREFA:  "Tarefa",
   IDEIA:   "Ideia",
 }
+
+const PRIO_OPTS: { value: Prio; label: string }[] = [
+  { value: "CRITICA", label: "Crítica" },
+  { value: "ALTA",    label: "Alta"    },
+  { value: "MEDIA",   label: "Média"   },
+  { value: "BAIXA",   label: "Baixa"   },
+]
 
 export default function NovaCaptura() {
   const router             = useRouter()
@@ -37,18 +48,32 @@ export default function NovaCaptura() {
 
   const [modo,      setModo]      = useState<Modo>(modoInicial)
   const [tipo,      setTipo]      = useState<Tipo>(tipoParam)
-  const [titulo,    setTitulo]    = useState("")
+
+  // ── Campos comuns (voz/texto) ──────────────────────────────────────────────
   const [descricao, setDescricao] = useState("")
   const [gravando,  setGravando]  = useState(false)
   const [audioUrl,  setAudioUrl]  = useState<string | null>(null)
   const [tempo,     setTempo]     = useState(0)
+
+  // ── Campos exclusivos do modo manual ──────────────────────────────────────
+  const [titulo,         setTitulo]         = useState("")
+  const [descManual,     setDescManual]     = useState("")
+  const [manualPrio,     setManualPrio]     = useState<Prio>("MEDIA")
+  const [manualPrazo,    setManualPrazo]    = useState("")
+  const [manualSolic,    setManualSolic]    = useState("")
+  const [manualDeleg,    setManualDeleg]    = useState("")
+  const [manualAcoes,    setManualAcoes]    = useState<string[]>([])
+  const [novaAcao,       setNovaAcao]       = useState("")
+
+  // ── Estado geral ──────────────────────────────────────────────────────────
   const [loading,   setLoading]   = useState(false)
   const [erro,      setErro]      = useState<string | null>(null)
 
-  const mediaRef  = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const timerRef  = useRef<NodeJS.Timeout | null>(null)
-  const mimeRef   = useRef<string>("audio/webm")
+  const mediaRef     = useRef<MediaRecorder | null>(null)
+  const chunksRef    = useRef<Blob[]>([])
+  const timerRef     = useRef<NodeJS.Timeout | null>(null)
+  const mimeRef      = useRef<string>("audio/webm")
+  const inputAcaoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
@@ -58,11 +83,31 @@ export default function NovaCaptura() {
     setModo(novoModo)
     setTitulo("")
     setDescricao("")
+    setDescManual("")
     setAudioUrl(null)
     setErro(null)
+    setManualPrio("MEDIA")
+    setManualPrazo("")
+    setManualSolic("")
+    setManualDeleg("")
+    setManualAcoes([])
+    setNovaAcao("")
   }
 
-  // ── Gravação de voz ────────────────────────────────────────────────────────
+  // ── Ações manuais inline ──────────────────────────────────────────────────
+  function adicionarAcao() {
+    const t = novaAcao.trim()
+    if (!t) return
+    setManualAcoes((prev) => [...prev, t])
+    setNovaAcao("")
+    inputAcaoRef.current?.focus()
+  }
+
+  function removerAcao(idx: number) {
+    setManualAcoes((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  // ── Gravação de voz ───────────────────────────────────────────────────────
   async function iniciarGravacao() {
     setErro(null)
     setAudioUrl(null)
@@ -117,7 +162,7 @@ export default function NovaCaptura() {
     }
   }
 
-  // ── Submissão ──────────────────────────────────────────────────────────────
+  // ── Submissão ─────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErro(null)
@@ -131,7 +176,17 @@ export default function NovaCaptura() {
     setLoading(true)
     try {
       const body = modo === "manual"
-        ? { manual: true, titulo: titulo.trim(), descricao: descricao.trim() || undefined, tipo }
+        ? {
+            manual:          true,
+            titulo:          titulo.trim(),
+            descricao:       descManual.trim() || undefined,
+            tipo,
+            prioridade:      manualPrio,
+            prazo:           manualPrazo || null,
+            solicitanteNome: manualSolic.trim() || null,
+            delegadoNome:    manualDeleg.trim() || null,
+            acoes:           manualAcoes,
+          }
         : { audioUrl, descricao: descricao.trim() || undefined, tipo }
 
       const res  = await fetch("/api/demandas", {
@@ -303,9 +358,11 @@ export default function NovaCaptura() {
 
         {/* ── MODO MANUAL ───────────────────────────────────────────────────── */}
         {(modo === "manual" || aiBloqueado) && (
-          <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+          <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
+
+            {/* Título */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">
                 Título <span className="text-red-400">*</span>
               </label>
               <input
@@ -322,19 +379,145 @@ export default function NovaCaptura() {
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
             </div>
+
+            {/* Descrição */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">
                 Descrição{" "}
-                <span className="text-slate-400 font-normal text-xs">(opcional)</span>
+                <span className="text-slate-400 font-normal">(opcional)</span>
               </label>
               <textarea
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                rows={4}
+                value={descManual}
+                onChange={(e) => setDescManual(e.target.value)}
+                rows={3}
                 placeholder="Contexto, observações, detalhes relevantes…"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-300"
               />
             </div>
+
+            {/* Prioridade + Prazo */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">Prioridade</label>
+                <select
+                  value={manualPrio}
+                  onChange={(e) => setManualPrio(e.target.value as Prio)}
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  {PRIO_OPTS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  Prazo{" "}
+                  <span className="text-slate-400 font-normal">(opcional)</span>
+                  {manualPrazo && (
+                    <button
+                      type="button"
+                      onClick={() => setManualPrazo("")}
+                      className="text-slate-400 hover:text-red-500 ml-1.5"
+                    >
+                      <X size={10} className="inline" />
+                    </button>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  value={manualPrazo}
+                  onChange={(e) => setManualPrazo(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+            </div>
+
+            {/* Solicitante + Delegado */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  Solicitante{" "}
+                  <span className="text-slate-400 font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={manualSolic}
+                  onChange={(e) => setManualSolic(e.target.value)}
+                  maxLength={200}
+                  placeholder="Quem pediu…"
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  Delegado para{" "}
+                  <span className="text-slate-400 font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={manualDeleg}
+                  onChange={(e) => setManualDeleg(e.target.value)}
+                  maxLength={200}
+                  placeholder="Quem vai executar…"
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+            </div>
+
+            {/* Próximas ações */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                Próximas ações{" "}
+                <span className="text-slate-400 font-normal">(opcional)</span>
+              </label>
+
+              {/* Lista das ações já adicionadas */}
+              {manualAcoes.length > 0 && (
+                <div className="space-y-1.5 mb-2">
+                  {manualAcoes.map((a, idx) => (
+                    <div key={idx} className="flex items-center gap-2 group">
+                      <div className="w-3.5 h-3.5 shrink-0 rounded border border-slate-300 mt-0.5" />
+                      <span className="flex-1 text-sm text-slate-700 leading-snug">{a}</span>
+                      <button
+                        type="button"
+                        onClick={() => removerAcao(idx)}
+                        className="shrink-0 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Remover"
+                      >
+                        <Trash2 size={12} strokeWidth={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Input para nova ação */}
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-3.5 shrink-0 rounded border border-slate-200 mt-0.5" />
+                <input
+                  ref={inputAcaoRef}
+                  type="text"
+                  value={novaAcao}
+                  onChange={(e) => setNovaAcao(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); adicionarAcao() }
+                  }}
+                  maxLength={1000}
+                  placeholder="Descreva uma ação e pressione Enter…"
+                  className="flex-1 border border-slate-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-300"
+                />
+                <button
+                  type="button"
+                  onClick={adicionarAcao}
+                  disabled={!novaAcao.trim()}
+                  className="shrink-0 p-2 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 disabled:opacity-40 transition-colors"
+                  title="Adicionar ação"
+                >
+                  <Plus size={14} strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -367,7 +550,7 @@ export default function NovaCaptura() {
   )
 }
 
-// ── Botão de modo ──────────────────────────────────────────────────────────────
+// ── Botão de modo ─────────────────────────────────────────────────────────────
 function ModoBtn({
   ativo, onClick, icon, label,
 }: {

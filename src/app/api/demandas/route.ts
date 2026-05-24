@@ -58,6 +58,8 @@ export async function POST(req: Request) {
       prazo:     prazoBody,
       solicitanteNome: solNomeBody,
       delegadoUserId:  delegadoBody,
+      delegadoNome:    delegadoNomeBody,
+      acoes:           acoesBody,
     } = body
 
     if (!audioUrl && !descricao && !tituloBody) {
@@ -177,7 +179,10 @@ REGRAS:
     const titulo    = tituloBody    ?? aiResult.titulo    ?? "Sem título"
     const tipo      = (tipoBody     ?? aiResult.tipo      ?? "DEMANDA")  as "DEMANDA" | "TAREFA" | "IDEIA"
     const prioridade = (prioBody    ?? aiResult.prioridade ?? "MEDIA")   as "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
-    const acoes      = (aiResult.acoes ?? []) as string[]
+    // No modo manual usa ações enviadas no body; IA usa as geradas pelo GPT
+    const acoes = (manual
+      ? (acoesBody ?? [])
+      : (aiResult.acoes ?? [])) as string[]
 
     // No modo manual, usa descricao do body diretamente (aiResult está vazio)
     const descricaoFinal = manual ? (descricao ?? null) : (aiResult.descricao ?? descricao ?? null)
@@ -194,6 +199,7 @@ REGRAS:
         solicitanteNome:  solicitanteUserId ? null : nomeSolicitante,
         solicitanteUserId,
         delegadoUserId:   delegadoBody ?? null,
+        delegadoNome:     delegadoNomeBody ?? null,
         audioUrl:         audioUrl ?? null,
         aiProcessado:     usandoIA && !aiBlocked,
         acoes: {
