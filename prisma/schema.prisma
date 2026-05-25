@@ -189,3 +189,17 @@ model AcaoDemanda {
 
   @@map("acoes_demanda")
 }
+
+model CronExecucao {
+  id          Int      @id @default(autoincrement())
+  job         String   @db.VarChar(50)
+  executadoEm DateTime @default(now())
+  enviados    Int      @default(0)
+  d0          Int      @default(0)
+  d1          Int      @default(0)
+  erros       Int      @default(0)
+  detalhes    String?  @db.Text
+
+  @@index([job, executadoEm])
+  @@map("cron_execucoes")
+}

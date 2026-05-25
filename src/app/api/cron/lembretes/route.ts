@@ -108,6 +108,18 @@ export async function GET(req: Request) {
     }
   }
 
+  // ── Registra execução no banco ──────────────────────────────────────────────
+  await prisma.cronExecucao.create({
+    data: {
+      job:      "lembretes",
+      enviados,
+      d0:       demandasHoje.length,
+      d1:       demandasAmanha.length,
+      erros:    erros.length,
+      detalhes: erros.length > 0 ? erros.slice(0, 3).join(" | ") : null,
+    },
+  })
+
   console.log(`[cron/lembretes] Concluído: ${enviados} e-mails enviados, ${erros.length} erros`)
 
   return NextResponse.json({
