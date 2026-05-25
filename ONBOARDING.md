@@ -176,7 +176,7 @@ demandoo/
 │   │   ├── openai.ts              # Lazy singleton OpenAI (não instancia em build time)
 │   │   ├── cloudinary.ts          # Config Cloudinary + publicIdFromUrl + deleteCloudinaryAsset
 │   │   └── email.ts               # sendVerificationEmail + sendPasswordResetEmail
-│   └── proxy.ts                   # Middleware de autenticação (Next.js 16: proxy.ts, não middleware.ts)
+│   └── middleware.ts               # Middleware de autenticação — /api/cron/* isento de auth
 ├── next.config.mjs                # Config Next.js (sem output:standalone, headers de segurança)
 ├── postcss.config.mjs             # PostCSS com Tailwind
 ├── tsconfig.json
@@ -206,25 +206,52 @@ demandoo/
 
 ---
 
-## 8. Pipeline de IA (POST /api/demandas)
+## 8. Modos de captura e pipeline de IA
+
+### Três modos de captura (`/app/nova`)
+
+| Modo | UI | Tipo escolhido por |
+|---|---|---|
+| **Voz** | Grava áudio → IA transcreve e estrutura | **IA** (automático) |
+| **Texto + IA** | Campo de texto livre → IA estrutura | **IA** (automático) |
+| **Manual** | Formulário completo com todos os campos | **Usuário** (seletor explícito) |
+
+> ⚠️ **Regra importante:** O seletor de tipo (Demanda / Tarefa / Ideia) só aparece no modo **Manual**. Nos modos Voz e Texto+IA, o usuário não escolhe — a IA classifica com base no conteúdo. O `tipo` enviado pelo front em modos com IA é ignorado pela API; prevalece `aiResult.tipo`.
+
+### Pipeline de IA (POST /api/demandas — modos Voz e Texto+IA)
 
 ```
 1. Verifica quota (company.aiUsedTotal >= plan.aiQuota → retorna aiBlocked)
-2. Se audioUrl → fetch do áudio → Whisper → transcricao
-3. GPT-4o-mini (uma chamada):
+2. Se audioUrl → fetch do áudio → Whisper-1 → transcricao (pt)
+3. GPT-4o-mini (uma chamada, response_format: json_object):
    - Injeta: data de hoje em BRT + dia da semana
    - Retorna JSON: { titulo, descricao, tipo, prioridade, prazo, acoes, solicitanteNome }
-4. Tipo DEMANDA/TAREFA/IDEIA classificado pelo GPT via heurísticas no prompt
+4. Tipo: classificado pela IA (veja regras abaixo) — tipoBody do front é ignorado
 5. Prazo: GPT resolve datas relativas ("amanhã", "sexta") → YYYY-MM-DD → parseDateBRT()
 6. Solicitante: match por primeiro nome em users da mesma company
-7. Salva demanda + acoes em transação
+7. Salva demanda + acoes em transação (aiProcessado: true)
 8. Incrementa company.aiUsedTotal
 ```
 
-**Prompt de classificação de tipo:**
-- IDEIA: "tive uma ideia", "pensei em", "e se...", "uma sacada", tom exploratório
-- TAREFA: pedido simples do próprio usuário, sem terceiros, 1-2 ações
-- DEMANDA (padrão): solicitante terceiro, contexto narrativo, múltiplos passos
+### Regras de classificação de tipo (prompt GPT)
+
+Árvore de decisão aplicada nesta ordem:
+
+```
+Tem expressão de ideia OU tom exploratório/hipotético?  → IDEIA
+Senão, pedido simples só de quem fala, sem terceiros?   → TAREFA
+Senão (qualquer outro caso, inclusive dúvida)           → DEMANDA
+```
+
+**💡 IDEIA** — fala contém: "tive uma ideia", "tenho uma ideia", "tive um insight", "pensei em", "pensei numa", "uma sacada", "e se...", "imagina se" — ou tom exploratório/criativo sem pedido concreto.
+- Geralmente sem prazo, prioridade BAIXA, ações exploratórias (validar, pesquisar, prototipar) ou nenhuma.
+
+**✅ TAREFA** — pedido simples e direto: só envolve quem fala (sem terceiros), curto, máx 1-2 ações.
+- Ex.: "comprar pão amanhã", "ligar pro dentista", "lembrar de pagar a conta".
+
+**📋 DEMANDA** (padrão) — qualquer outro caso: solicitante terceiro, contexto narrativo, múltiplos passos, restrições, ou quando há dúvida.
+- Ex.: "A Alessandra pediu para eu comprar batatinhas para o almoço de domingo".
+- DEMANDA é o fallback — quando a IA está em dúvida, cai aqui.
 
 ---
 
@@ -274,7 +301,7 @@ demandoo/
 - Commit semântico via HEREDOC, arquivos nomeados (nunca `git add -A`)
 - Sem segredos no repo
 - Nunca `output: 'standalone'` — quebra o Passenger da Hostinger
-- Next.js 16: middleware chama-se `proxy.ts` (não `middleware.ts`)
+- Next.js 16: middleware obrigatoriamente em `src/middleware.ts` — build confirma com `ƒ Proxy (Middleware)`
 
 ---
 
@@ -347,8 +374,8 @@ Google OAuth bidirecional (refresh_token, sync, webhook) é complexo e tem manut
 ### Por que não `output: 'standalone'` no Next.js?
 O modo standalone quebra o Passenger da Hostinger (o servidor que roda o Node.js). Assets estáticos ficam com 404. A Hostinger gerencia o serving dos arquivos estáticos automaticamente quando não está em standalone.
 
-### Por que proxy.ts em vez de middleware.ts?
-Next.js 16 depreciou a convenção `middleware.ts` — o arquivo correto agora é `proxy.ts`. Usar o nome antigo gera warnings e pode parar de funcionar em versões futuras.
+### Por que `src/middleware.ts` e não outro nome?
+O Next.js só carrega middleware de arquivos com esse nome exato. Arquivos com outros nomes (ex.: `proxy.ts`) são ignorados silenciosamente — o app sobe sem proteção de rota. O build confirma que o middleware foi carregado exibindo `ƒ Proxy (Middleware)` no output.
 
 ---
 

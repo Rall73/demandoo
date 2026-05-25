@@ -234,25 +234,27 @@ export default function NovaCaptura() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        {/* Seletor de tipo */}
-        <div className="flex gap-2">
-          {(["DEMANDA", "TAREFA", "IDEIA"] as Tipo[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTipo(t)}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                tipo === t
-                  ? t === "DEMANDA" ? "bg-violet-600 text-white"
-                  : t === "TAREFA"  ? "bg-emerald-600 text-white"
-                  :                   "bg-amber-500 text-white"
-                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {TIPO_LABEL[t]}
-            </button>
-          ))}
-        </div>
+        {/* Seletor de tipo — só no modo manual (voz/texto: a IA classifica) */}
+        {modo === "manual" && (
+          <div className="flex gap-2">
+            {(["DEMANDA", "TAREFA", "IDEIA"] as Tipo[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTipo(t)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  tipo === t
+                    ? t === "DEMANDA" ? "bg-violet-600 text-white"
+                    : t === "TAREFA"  ? "bg-emerald-600 text-white"
+                    :                   "bg-amber-500 text-white"
+                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {TIPO_LABEL[t]}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Toggle de modo (escondido quando IA bloqueada — só sobra manual) */}
         {!aiBloqueado && (

@@ -131,10 +131,13 @@ export async function POST(req: Request) {
 Hoje é ${hoje} (${diaSemana}).
 Retorne SOMENTE um JSON com os campos: titulo, descricao, tipo, prioridade, prazo, acoes, solicitanteNome.
 
-CLASSIFICAÇÃO DO TIPO:
-- IDEIA: fala começa com "tive uma ideia", "pensei em", "uma sacada", "e se...", "imagina se", tom exploratório/hipotético. Não tem urgência ou solicitante.
-- TAREFA: pedido simples SÓ do próprio usuário, curto, máx 1-2 ações, sem terceiros. Ex.: "comprar pão amanhã", "ligar para o banco".
-- DEMANDA (padrão): solicitante terceiro, contexto narrativo, múltiplos passos, ou qualquer coisa que não se encaixe nos dois anteriores.
+CLASSIFICAÇÃO DO TIPO (árvore de decisão — nesta ordem):
+
+1. IDEIA — se a fala contém expressões como "tive uma ideia", "tenho uma ideia", "tive um insight", "pensei em", "pensei numa", "uma sacada", "e se...", "imagina se", ou tem tom exploratório/hipotético/criativo sem pedido concreto. Geralmente sem prazo definido, prioridade BAIXA, ações exploratórias (validar, pesquisar, prototipar) ou nenhuma ação.
+
+2. TAREFA — se for um pedido simples e direto que: só envolve quem fala (sem terceiros), é curto, tem no máximo 1-2 ações. Ex.: "comprar pão amanhã", "ligar pro dentista", "lembrar de pagar a conta".
+
+3. DEMANDA (padrão) — qualquer outro caso: solicitante terceiro mencionado, contexto narrativo, múltiplos passos, restrições, ou quando há dúvida. Ex.: "A Alessandra pediu para eu comprar batatinhas para o almoço de domingo". Use DEMANDA sempre que não tiver certeza.
 
 REGRAS:
 - titulo: máx 80 chars, conciso e claro.
@@ -177,7 +180,12 @@ REGRAS:
 
     // ─── Salva no banco ───────────────────────────────────────────────────────
     const titulo    = tituloBody    ?? aiResult.titulo    ?? "Sem título"
-    const tipo      = (tipoBody     ?? aiResult.tipo      ?? "DEMANDA")  as "DEMANDA" | "TAREFA" | "IDEIA"
+    // Manual: usa o tipo que o usuário escolheu explicitamente
+    // Voz/texto: a IA classifica — tipoBody é ignorado (fallback: DEMANDA)
+    const tipo      = (manual
+      ? (tipoBody ?? "DEMANDA")
+      : (aiResult.tipo ?? "DEMANDA")
+    ) as "DEMANDA" | "TAREFA" | "IDEIA"
     const prioridade = (prioBody    ?? aiResult.prioridade ?? "MEDIA")   as "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
     // No modo manual usa ações enviadas no body; IA usa as geradas pelo GPT
     const acoes = (manual
