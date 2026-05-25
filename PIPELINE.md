@@ -243,11 +243,11 @@ npx tsc --noEmit && npx next build && git push origin main
 | Demandas delegadas para outros usuários da empresa | Média | Hoje `delegadoNome` é texto livre; futuro: vincular ao `userId` |
 | Visão de equipe: demandas de todos os membros (ADMIN) | Média | Filtro por `userId` no dashboard |
 
-### 🔲 6.4 Notificações e Lembretes
+### ✅ 6.4 Notificações e Lembretes
 
 | Item | Prioridade | Observações |
 |---|---|---|
-| E-mail de lembrete de prazo (D-1 e D0) | Alta | Cron job ou queue |
+| E-mail de lembrete de prazo (D-1 e D0) | Alta | ✅ Cron job via cron-job.org — `GET /api/cron/lembretes` protegido por `CRON_SECRET` |
 | Notificação de nova demanda delegada | Média | E-mail para o delegado |
 | Notificação de demanda concluída | Baixa | E-mail para o solicitante |
 | Notificações in-app (badge na sidebar) | Média | Tabela `notifications` |
@@ -306,6 +306,7 @@ npx tsc --noEmit && npx next build && git push origin main
 | 2026-05-24 | v0.4.1 | Segurança: `.env` limpo de segredos; PIPELINE.md criado |
 | 2026-05-24 | v0.5 | SMTP Hostinger corrigido; Google OAuth → criar senha; login erros PT-BR |
 | 2026-05-24 | v0.6 | Página `/configuracoes`: perfil, avatar, troca de e-mail c/ verificação, senha, plano |
+| 2026-05-24 | v0.7 | Página `/planos` (individual + equipe), gestão de `/equipe` c/ convites por e-mail, lembretes de prazo por cron (D-0 e D-1), middleware corrigido |
 
 ---
 
@@ -314,12 +315,15 @@ npx tsc --noEmit && npx next build && git push origin main
 > Atualizar esta seção a cada sprint.
 
 ### Sprint atual
-- [ ] Página `/planos` (estrutura visual, sem billing real ainda)
+- Definir próximo sprint
 
 ### Backlog priorizado
 - [ ] Exportação de dados (LGPD)
-- [ ] Convite de membros da equipe (e-mail + token)
-- [ ] E-mail de lembrete de prazo (D-1 e D0)
+- [ ] Notificação de nova demanda delegada (e-mail para o delegado)
+- [ ] Notificação de demanda concluída (e-mail para o solicitante)
+- [ ] Notificações in-app (badge na sidebar)
+- [ ] Paginação nas listagens (hoje limitadas a 100 registros)
+- [ ] Delegação vinculada a `userId` (hoje é texto livre)
 
 ---
 
