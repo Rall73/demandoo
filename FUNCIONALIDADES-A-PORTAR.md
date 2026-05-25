@@ -1,5 +1,17 @@
 # Funcionalidades do módulo Demandas a portar para o demandoo
 
+> ⚠️ **DOCUMENTO HISTÓRICO — JÁ CUMPRIDO**
+>
+> Este foi o roadmap inicial de paridade com o projeto `inicio.aprendiassim.com/check-list`.
+> Praticamente todas as funcionalidades listadas aqui já foram implementadas no demandoo (ver `PIPELINE.md` v0.1 a v0.8).
+>
+> Mantido como referência histórica caso alguma feature isolada precise ser revisitada.
+> Para o estado atual do projeto, ver `ONBOARDING.md` e `PIPELINE.md`.
+>
+> Última verificação: 2026-05-25 (v0.8 entregue)
+
+---
+
 > **Documento de referência** extraído do projeto `inicio.aprendiassim.com` (pasta `check-list`).
 > Lista TODAS as funcionalidades do módulo de captura de demandas/tarefas/ideias já em produção lá,
 > que ainda **não foram implementadas** (ou estão em versão simplificada) no demandoo.

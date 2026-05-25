@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# demandoo
 
-## Getting Started
+> SaaS de captura de demandas, tarefas e ideias com IA.
+> Fale ou digite qualquer coisa — Whisper transcreve e GPT-4o-mini estrutura automaticamente.
 
-First, run the development server:
+🌐 **Produção:** [demandoo.net](https://demandoo.net)
+
+---
+
+## Stack
+
+- **Next.js 16** (App Router, Turbopack) + TypeScript
+- **Prisma 6** + MySQL (Hostinger)
+- **Auth.js v5** (Credentials + Google OAuth, JWT)
+- **OpenAI** Whisper-1 + GPT-4o-mini
+- **Cloudinary** para áudio e avatares
+- **Nodemailer** + SMTP Hostinger
+- **Tailwind CSS v4** + lucide-react
+- Cron via [cron-job.org](https://cron-job.org)
+
+---
+
+## Desenvolvimento local
 
 ```bash
+# 1. Clonar
+git clone https://github.com/Rall73/demandoo.git
+cd demandoo
+
+# 2. Instalar dependências (roda `prisma generate` automaticamente)
+npm install
+
+# 3. Copiar .env e preencher com valores reais (ver ONBOARDING.md)
+cp .env .env.local
+# edite .env.local
+
+# 4. Subir o dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# → http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Variáveis de ambiente necessárias estão documentadas em [`ONBOARDING.md`](./ONBOARDING.md).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Portão pré-deploy
 
-## Learn More
+Antes de qualquer `git push`, rodar nessa ordem:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx tsc --noEmit     # checa tipos
+npx next build       # build de produção (pega erros de rota/SSR/import)
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Deploy é **automático** ao fazer push na `main` (Hostinger detecta e rebuilda).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Documentação do projeto
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Arquivo | Para que serve |
+|---|---|
+| [`ONBOARDING.md`](./ONBOARDING.md) | **Comece aqui.** Contexto completo, stack, env vars, estrutura, decisões de design |
+| [`CLAUDE.md`](./CLAUDE.md) | Convenções obrigatórias (banco, fuso, UI, segurança, middleware, SMTP, deploy) |
+| [`AGENTS.md`](./AGENTS.md) | Aviso para agentes de IA sobre Next.js 16 |
+| [`PIPELINE.md`](./PIPELINE.md) | Histórico de versões + backlog priorizado |
+| [`FUNCIONALIDADES-A-PORTAR.md`](./FUNCIONALIDADES-A-PORTAR.md) | Histórico — porte de features do projeto original (já cumprido) |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Estrutura mínima
+
+```
+src/
+├── middleware.ts              # auth + libera /api/cron
+├── app/
+│   ├── (app)/                 # rotas autenticadas
+│   ├── admin/                 # painel super-admin (SUPER_ADMIN_EMAIL)
+│   ├── auth/                  # login, cadastro, recuperação
+│   ├── api/                   # endpoints REST
+│   └── como-funciona/         # página pública do produto
+├── auth/                      # config Auth.js v5
+├── components/                # Sidebar, Providers
+└── lib/                       # prisma, openai, cloudinary, date, email
+```
+
+Ver [`ONBOARDING.md`](./ONBOARDING.md) para a estrutura completa.
+
+---
+
+## Licença
+
+Privado — todos os direitos reservados.

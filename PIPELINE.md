@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-05-24
+> **Última atualização:** 2026-05-25
 
 ---
 
@@ -189,9 +189,76 @@ ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatarUrl` VARCHAR(1000) NULL;
 | `/api/demandas/[id]/acoes/[acaoId]` | PATCH, DELETE | ✅ |
 | `/api/demandas/[id]/calendar.ics` | GET | ✅ |
 | `/api/upload/audio` | POST | ✅ |
+| `/api/upload/avatar` | POST | ✅ |
 | `/api/auth/cadastro` | POST | ✅ |
 | `/api/auth/esqueci-senha` | POST | ✅ |
 | `/api/auth/nova-senha` | POST | ✅ |
+| `/api/auth/aceitar-convite` | POST | ✅ |
+| `/api/configuracoes/perfil` | PATCH | ✅ |
+| `/api/configuracoes/email` | POST | ✅ |
+| `/api/configuracoes/senha` | POST | ✅ |
+| `/api/equipe` | GET | ✅ |
+| `/api/equipe/[userId]` | PATCH, DELETE | ✅ |
+| `/api/equipe/convite` | POST | ✅ |
+| `/api/equipe/convite/[token]` | GET | ✅ |
+| `/api/admin/planos/[id]` | PATCH | ✅ |
+| `/api/cron/lembretes` | GET (bearer auth) | ✅ |
+
+### ✅ 4.8 Configurações da Conta (`/configuracoes`)
+
+| Item | Status |
+|---|---|
+| Edição de perfil (nome + avatar) | ✅ |
+| Troca de e-mail com verificação por token | ✅ |
+| Alteração de senha (suporta criar 1ª senha para Google) | ✅ |
+| Card de plano com countdown de trial | ✅ |
+
+### ✅ 4.9 Equipe (`/equipe`)
+
+| Item | Status |
+|---|---|
+| Lista de membros ativos | ✅ |
+| Convites por e-mail (token) | ✅ |
+| Aceitar convite (`/auth/convite`) | ✅ |
+| Alterar role (ADMIN/USER) | ✅ |
+| Remover membro (soft delete) | ✅ |
+
+### ✅ 4.10 Painel Admin (`/admin`) — restrito a `SUPER_ADMIN_EMAIL`
+
+| Item | Status |
+|---|---|
+| Dashboard com KPIs globais | ✅ |
+| `/admin/empresas` — lista de tenants | ✅ |
+| `/admin/usuarios` — lista global de usuários | ✅ |
+| `/admin/planos` — edição inline (preço, quota, max users, ativo) | ✅ |
+| `/admin/consumo` — OpenAI/Cloudinary/Cron + top 10 consumidores IA + links rápidos | ✅ |
+
+### ✅ 4.11 Cron Jobs
+
+| Item | Status |
+|---|---|
+| Lembretes de prazo D-0 e D-1 (11h BRT diariamente) | ✅ |
+| Protegido por `Authorization: Bearer <CRON_SECRET>` | ✅ |
+| Log de cada execução em `cron_execucoes` (enviados, d0, d1, erros, detalhes) | ✅ |
+| Dispatcher externo: cron-job.org | ✅ |
+
+### ✅ 4.12 Páginas Públicas
+
+| Página | Status |
+|---|---|
+| `/` — Landing | ✅ |
+| `/como-funciona` — Guia completo do produto (SSG) | ✅ |
+| `/planos` — Tabela de planos individual + equipe | ✅ |
+| `/auth/login`, `/auth/cadastro`, `/auth/verificar`, `/auth/esqueci-senha`, `/auth/nova-senha`, `/auth/convite`, `/auth/confirmar-email` | ✅ |
+
+### ✅ 4.13 PWA / Identidade Visual
+
+| Item | Status |
+|---|---|
+| Favicon ⚡ raio (32×32, gradiente violet) — `src/app/icon.tsx` | ✅ |
+| Apple Touch Icon (180×180) — `src/app/apple-icon.tsx` | ✅ |
+| SVG escalável para Android PWA — `public/icon.svg` | ✅ |
+| `manifest.json` configurado (any + maskable) | ✅ |
 
 ---
 
@@ -307,6 +374,7 @@ npx tsc --noEmit && npx next build && git push origin main
 | 2026-05-24 | v0.5 | SMTP Hostinger corrigido; Google OAuth → criar senha; login erros PT-BR |
 | 2026-05-24 | v0.6 | Página `/configuracoes`: perfil, avatar, troca de e-mail c/ verificação, senha, plano |
 | 2026-05-24 | v0.7 | Página `/planos` (individual + equipe), gestão de `/equipe` c/ convites por e-mail, lembretes de prazo por cron (D-0 e D-1), middleware corrigido |
+| 2026-05-25 | v0.8 | Página pública `/como-funciona` (guia do produto), classificação IA corrigida (voz/texto: IA decide o tipo, seletor só em manual), painel `/admin` completo (dashboard + empresas + usuários + planos com edição inline + consumo de recursos), API `PATCH /api/admin/planos/[id]`, log de execuções do cron em `cron_execucoes`, novo ícone ⚡ (raio) em todos os formatos, ordenação na lista (Padrão / Prazo / Prioridade / Recente) |
 
 ---
 
@@ -315,15 +383,25 @@ npx tsc --noEmit && npx next build && git push origin main
 > Atualizar esta seção a cada sprint.
 
 ### Sprint atual
-- Definir próximo sprint
+- Definir próximo sprint (sugestões: billing/pagamento, LGPD, ou notificações)
 
-### Backlog priorizado
-- [ ] Exportação de dados (LGPD)
-- [ ] Notificação de nova demanda delegada (e-mail para o delegado)
-- [ ] Notificação de demanda concluída (e-mail para o solicitante)
-- [ ] Notificações in-app (badge na sidebar)
-- [ ] Paginação nas listagens (hoje limitadas a 100 registros)
-- [ ] Delegação vinculada a `userId` (hoje é texto livre)
+### Backlog priorizado (atualizado 2026-05-25)
+- [ ] 🔴 Billing/pagamento (Stripe ou Pagar.me) — sem isso planos pagos não ativam
+- [ ] 🔴 Exportação de dados (LGPD) — obrigação legal
+- [ ] 🔴 Exclusão de conta (LGPD) — obrigação legal
+- [ ] 🟡 Notificação de nova demanda delegada (e-mail para o delegado)
+- [ ] 🟡 Notificação de demanda concluída (e-mail para o solicitante)
+- [ ] 🟡 Notificações in-app (badge na sidebar)
+- [ ] 🟡 Delegação vinculada a `userId` (hoje é texto livre)
+- [ ] 🟡 Paginação nas listagens (hoje limitadas a 100 registros)
+- [ ] 🟡 Relatórios / export CSV
+
+### Mudanças no fluxo de trabalho (2026-05-25)
+**Regra acordada:** Claude **nunca faz push sem autorização explícita**. Fluxo:
+1. Implementa as mudanças
+2. Roda `npx tsc --noEmit` + `npx next build` localmente
+3. Avisa que está pronto para teste
+4. Aguarda Ricardo dizer "pode subir" antes de qualquer `git push`
 
 ---
 
