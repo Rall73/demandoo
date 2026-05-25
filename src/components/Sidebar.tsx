@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap, Settings, Users } from "lucide-react"
+import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap, Settings, Users, Home } from "lucide-react"
 import { signOut } from "next-auth/react"
 
 interface User {
@@ -16,23 +16,32 @@ interface User {
 }
 
 const NAV = [
-  { href: "/app",              label: "Demandas",      icon: Inbox,       tipo: "DEMANDA" },
-  { href: "/app?tipo=TAREFA",  label: "Tarefas",       icon: CheckSquare, tipo: "TAREFA" },
-  { href: "/app?tipo=IDEIA",   label: "Ideias",        icon: Lightbulb,   tipo: "IDEIA" },
-  { href: "/app/calendario",   label: "Calendário",    icon: Calendar,    tipo: null },
-  { href: "/app/nova",         label: "Nova captura",  icon: Plus,        tipo: null },
-  { href: "/configuracoes",    label: "Configurações", icon: Settings,    tipo: null },
+  { href: "/app",                    label: "Início",        icon: Home,        tipo: null },
+  { href: "/app/lista?tipo=DEMANDA", label: "Demandas",      icon: Inbox,       tipo: "DEMANDA" },
+  { href: "/app/lista?tipo=TAREFA",  label: "Tarefas",       icon: CheckSquare, tipo: "TAREFA" },
+  { href: "/app/lista?tipo=IDEIA",   label: "Ideias",        icon: Lightbulb,   tipo: "IDEIA" },
+  { href: "/app/calendario",         label: "Calendário",    icon: Calendar,    tipo: null },
+  { href: "/app/nova",               label: "Nova captura",  icon: Plus,        tipo: null },
+  { href: "/configuracoes",          label: "Configurações", icon: Settings,    tipo: null },
 ]
 
 function isActive(pathname: string, currentTipo: string | null, href: string): boolean {
   const [hPath, hQuery] = href.split("?")
   const hTipo = hQuery ? new URLSearchParams(hQuery).get("tipo") : null
 
-  if (hPath !== "/app") {
-    return pathname === hPath || pathname.startsWith(hPath + "/")
+  // /app (Início) — match exato, sem qualquer query
+  if (hPath === "/app" && !hTipo) {
+    return pathname === "/app"
   }
-  if (pathname !== "/app") return false
-  return (currentTipo ?? "DEMANDA") === (hTipo ?? "DEMANDA")
+
+  // /app/lista?tipo=X — match por tipo na query
+  if (hPath === "/app/lista") {
+    if (pathname !== "/app/lista") return false
+    return (currentTipo ?? "DEMANDA") === (hTipo ?? "DEMANDA")
+  }
+
+  // Outras rotas — prefix match
+  return pathname === hPath || pathname.startsWith(hPath + "/")
 }
 
 export default function Sidebar({ user }: { user: User }) {

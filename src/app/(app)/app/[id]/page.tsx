@@ -81,7 +81,7 @@ export default async function DetalhePage({
       {/* ── Cabeçalho — badges de status/prioridade ───────────────────────────── */}
       <div className="flex items-start gap-3 mb-6">
         <Link
-          href="/app"
+          href={`/app/lista?tipo=${demanda.tipo}`}
           className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 mt-0.5"
         >
           <ArrowLeft size={18} strokeWidth={2} />

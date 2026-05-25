@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   Search, X, CheckCircle2, Clock, PlayCircle, Ban,
-  AlertTriangle, ChevronRight, Inbox, CheckSquare, Lightbulb, Loader2, Sparkles,
+  AlertTriangle, ChevronRight, Inbox, CheckSquare, Lightbulb, Loader2, Sparkles, ArrowUpDown,
 } from "lucide-react"
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -62,6 +62,32 @@ const TIPO_NOME: Record<Tipo, string> = {
   IDEIA:   "ideias",
 }
 
+type Ordenacao = "PADRAO" | "PRAZO" | "PRIORIDADE" | "RECENTE"
+
+const PRIO_ORDER: Record<Prio, number> = { CRITICA: 0, ALTA: 1, MEDIA: 2, BAIXA: 3 }
+
+function ordenar(lista: DemandaItem[], ord: Ordenacao): DemandaItem[] {
+  const copia = [...lista]
+  if (ord === "PADRAO") return copia
+
+  if (ord === "PRAZO") {
+    return copia.sort((a, b) => {
+      // vencidas e com prazo primeiro (crescente); sem prazo por último
+      if (!a.prazo && !b.prazo) return 0
+      if (!a.prazo) return 1
+      if (!b.prazo) return -1
+      return new Date(a.prazo).getTime() - new Date(b.prazo).getTime()
+    })
+  }
+
+  if (ord === "PRIORIDADE") {
+    return copia.sort((a, b) => PRIO_ORDER[a.prioridade] - PRIO_ORDER[b.prioridade])
+  }
+
+  // RECENTE
+  return copia.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem[]; tipo: Tipo }) {
   const router = useRouter()
@@ -69,6 +95,7 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
   const [busca,        setBusca]        = useState("")
   const [filtroStatus, setFiltroStatus] = useState<string>("TODOS")
   const [filtroPrio,   setFiltroPrio]   = useState<string>("TODAS")
+  const [ordenacao,    setOrdenacao]    = useState<Ordenacao>("PADRAO")
   const [toggling,     setToggling]     = useState<number | null>(null)
 
   // Prazo vencido: compara data em UTC com now() (só p/ display — ok no client)
@@ -79,27 +106,31 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
     d.status !== "CONCLUIDA" &&
     d.status !== "CANCELADA"
 
-  // Filtragem
-  const filtradas = demandas.filter((d) => {
-    if (filtroStatus !== "TODOS" && d.status     !== filtroStatus) return false
-    if (filtroPrio   !== "TODAS" && d.prioridade !== filtroPrio)   return false
-    if (busca.trim()) {
-      const q = busca.toLowerCase()
-      if (
-        !d.titulo.toLowerCase().includes(q) &&
-        !(d.descricao ?? "").toLowerCase().includes(q) &&
-        !(d.solicitanteNome ?? "").toLowerCase().includes(q)
-      ) return false
-    }
-    return true
-  })
+  // Filtragem + ordenação
+  const filtradas = ordenar(
+    demandas.filter((d) => {
+      if (filtroStatus !== "TODOS" && d.status     !== filtroStatus) return false
+      if (filtroPrio   !== "TODAS" && d.prioridade !== filtroPrio)   return false
+      if (busca.trim()) {
+        const q = busca.toLowerCase()
+        if (
+          !d.titulo.toLowerCase().includes(q) &&
+          !(d.descricao ?? "").toLowerCase().includes(q) &&
+          !(d.solicitanteNome ?? "").toLowerCase().includes(q)
+        ) return false
+      }
+      return true
+    }),
+    ordenacao
+  )
 
-  const temFiltros = !!(busca.trim() || filtroStatus !== "TODOS" || filtroPrio !== "TODAS")
+  const temFiltros = !!(busca.trim() || filtroStatus !== "TODOS" || filtroPrio !== "TODAS" || ordenacao !== "PADRAO")
 
   function limparFiltros() {
     setBusca("")
     setFiltroStatus("TODOS")
     setFiltroPrio("TODAS")
+    setOrdenacao("PADRAO")
   }
 
   // Toggle TAREFA ABERTA ↔ CONCLUIDA com 1 clique
@@ -162,6 +193,21 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
             <option value="BAIXA">Baixa</option>
           </select>
         )}
+
+        {/* Ordenação */}
+        <div className="relative">
+          <ArrowUpDown size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <select
+            value={ordenacao}
+            onChange={(e) => setOrdenacao(e.target.value as Ordenacao)}
+            className="pl-7 pr-2.5 py-2 border border-slate-200 rounded-lg text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+          >
+            <option value="PADRAO">Padrão</option>
+            <option value="PRAZO">Prazo mais próximo</option>
+            <option value="PRIORIDADE">Prioridade</option>
+            <option value="RECENTE">Mais recente</option>
+          </select>
+        </div>
 
         {/* Limpar filtros */}
         {temFiltros && (
