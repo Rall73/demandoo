@@ -4,19 +4,26 @@
   "description": "Capture qualquer demanda em segundos",
   "start_url": "/app",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#7c3aed",
   "theme_color": "#7c3aed",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon.png",
-      "sizes": "32x32",
+      "src": "/apple-icon",
+      "sizes": "180x180",
       "type": "image/png"
     },
     {
-      "src": "/apple-icon.png",
-      "sizes": "180x180",
-      "type": "image/png"
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }
