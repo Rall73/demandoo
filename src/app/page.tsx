@@ -13,6 +13,9 @@ export default function LandingPage() {
           <span className="font-bold text-slate-900 text-lg">demandoo</span>
         </div>
         <div className="flex items-center gap-3">
+          <Link href="/como-funciona" className="hidden md:block text-sm text-slate-600 hover:text-slate-900 font-medium">
+            Como funciona
+          </Link>
           <Link href="/auth/login" className="text-sm text-slate-600 hover:text-slate-900 font-medium">
             Entrar
           </Link>
@@ -243,7 +246,8 @@ export default function LandingPage() {
             </div>
             <span className="text-sm font-bold text-slate-700">demandoo</span>
           </div>
-          <div className="flex gap-6 text-sm text-slate-500">
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-slate-500">
+            <Link href="/como-funciona" className="hover:text-slate-700 font-medium">Como funciona</Link>
             <Link href="/politica-de-privacidade" className="hover:text-slate-700">Política de Privacidade</Link>
             <Link href="/termos-de-uso" className="hover:text-slate-700">Termos de Uso</Link>
             <a href="mailto:contato@demandoo.net" className="hover:text-slate-700">Contato</a>

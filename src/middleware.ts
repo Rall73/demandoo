@@ -5,6 +5,7 @@ import type { NextRequest } from "next/server"
 // Rotas públicas que não precisam de autenticação
 const PUBLIC_PATHS = [
   "/",
+  "/como-funciona",
   "/auth/login",
   "/auth/cadastro",
   "/auth/verificar",
