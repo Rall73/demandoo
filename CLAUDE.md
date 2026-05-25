@@ -39,6 +39,13 @@ Stack: Next.js 16 (App Router) + Prisma + MySQL + Auth.js v5 + OpenAI + Cloudina
 - Sem segredos no repo — tudo nas env vars do painel Hostinger
 - Nunca `output: 'standalone'` no next.config — quebra o Passenger
 
+### Middleware
+- Arquivo obrigatoriamente em `src/middleware.ts` — qualquer outro nome é ignorado pelo Next.js
+- Build correto exibe `ƒ Proxy (Middleware)` no output
+- Rotas `/api/cron/*` devem ser explicitamente isentas de autenticação no middleware
+- Cron jobs protegidos por `Authorization: Bearer <CRON_SECRET>` no header (nunca por sessão)
+- URL do cron sempre com `https://` — `http://` gera 301 que o cron-job.org não segue
+
 ### E-mail transacional (Nodemailer + Hostinger SMTP)
 - SMTP: `smtp.hostinger.com`, porta `465` (SSL, `secure: true`) ou `587` (STARTTLS, `secure: false`)
 - **Senha de e-mail: NUNCA usar caracteres especiais** (`#`, `@`, `!`, `$`, etc.)
