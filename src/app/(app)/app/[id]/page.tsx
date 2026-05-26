@@ -2,7 +2,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Calendar, Mic, AlertTriangle, Sparkles, User } from "lucide-react"
+import { ArrowLeft, Calendar, Mic, AlertTriangle, Sparkles, User, Printer } from "lucide-react"
 import DetalheActions from "./DetalheActions"
 import DetalheContent from "./DetalheContent"
 import AcoesInterativas from "./AcoesInterativas"
@@ -86,7 +86,7 @@ export default async function DetalhePage({
         >
           <ArrowLeft size={18} strokeWidth={2} />
         </Link>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap flex-1">
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLOR[demanda.status]}`}>
             {STATUS_LABEL[demanda.status]}
           </span>
@@ -106,6 +106,15 @@ export default async function DetalhePage({
             </span>
           )}
         </div>
+        <a
+          href={`/relatorios/imprimir?ids=${demanda.id}&tipo=${demanda.tipo}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+          title="Imprimir este item"
+        >
+          <Printer size={16} strokeWidth={2} />
+        </a>
       </div>
 
       {/* ── Card principal: tipo (dropdown) + título + descrição + editar detalhes ── */}
