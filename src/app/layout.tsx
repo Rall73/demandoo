@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Geist } from "next/font/google"
+import { GoogleAnalytics } from "@next/third-parties/google"
 import Providers from "@/components/Providers"
 import "./globals.css"
 
@@ -30,6 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full bg-slate-50 text-slate-900">
         <Providers>{children}</Providers>
       </body>
+      {process.env.NEXT_PUBLIC_GA_ID && (
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
+      )}
     </html>
   )
 }
