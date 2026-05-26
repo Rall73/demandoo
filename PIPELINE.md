@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-05-25
+> **Última atualização:** 2026-05-25 (v1.0)
 
 ---
 
@@ -16,7 +16,8 @@ Profissionais e equipes perdem demandas recebidas por WhatsApp, reuniões, e-mai
 ### Proposta de valor
 - **Captura rápida** por voz ou texto livre — a IA estrutura automaticamente
 - **Organização em três trilhos**: Demandas (solicitações externas), Tarefas (próprias) e Ideias
-- **Gestão leve**: status, prioridade, prazo, delegação, próximas ações
+- **Histórico completo**: cada item tem linha do tempo de atualizações, notas de voz e log automático de status
+- **Relatório IA**: GPT gera relatório estruturado do ciclo de vida completo, editável e imprimível
 - **Multi-tenant**: cada empresa tem seu ambiente isolado
 
 ### Modelo de negócio
@@ -34,9 +35,9 @@ Planos por empresa (tenant). Plano free com quota de IA limitada; planos pagos c
 | ORM | Prisma |
 | Autenticação | Auth.js v5 (Credentials + Google OAuth) |
 | IA — transcrição | OpenAI Whisper-1 |
-| IA — estruturação | OpenAI GPT-4o-mini |
-| Upload de áudio | Cloudinary |
-| E-mail transacional | Nodemailer + Gmail SMTP (App Password) |
+| IA — estruturação / relatórios | OpenAI GPT-4o-mini |
+| Upload de áudio / avatares | Cloudinary |
+| E-mail transacional | Nodemailer + Hostinger SMTP |
 | Estilização | Tailwind CSS |
 | Ícones | lucide-react |
 | Deploy | Hostinger (Node.js Passenger) |
@@ -51,8 +52,10 @@ plans
   └── companies (tenant)
         └── users
               └── demandas
-                    └── acoes_demanda
+                    ├── acoes_demanda
+                    └── comentarios      ← NOVO (histórico + notas de voz)
 accounts / sessions / verification_tokens  (Auth.js)
+cron_execucoes
 ```
 
 ### Convenções aplicadas
@@ -60,38 +63,63 @@ accounts / sessions / verification_tokens  (Auth.js)
 - `companyId` em toda tabela de domínio (isolamento de tenant)
 - Fuso horário: servidor UTC, lógica de "hoje" sempre em BRT via `src/lib/date.ts`
 
-### Dados de referência — tabela `plans` (estado atual)
+### Campos relevantes em `demandas`
 
-| id | slug | name | priceCents | aiQuota | maxUsers | Tipo | Observação |
-|---|---|---|---|---|---|---|---|
-| 1 | `free` | Gratuito | 0 | 20 | 1 | Individual | Default no cadastro — `planId: 1` hardcoded |
-| 2 | `pro` | Profissional | 1990 | NULL | 1 | Legado | Slug antigo, mantido para não quebrar dados |
-| 3 | `team` | Equipe | 4990 | NULL | 5 | Legado | Slug antigo, mantido para não quebrar dados |
-| 4 | `trial` | Trial | 0 | 100 | 5 | Especial | Período de teste — usa `planExpiresAt` |
-| 5 | `basic` | Básico | placeholder | 200 | 1 | Individual | Plano pago individual básico |
-| 6 | `complete` | Completo | placeholder | 500 | 1 | Individual | Plano pago individual completo |
-| 7 | `basic_equipe` | Básico Equipe | placeholder | 500 | 5 | Equipe | Plano pago para equipes pequenas |
-| 8 | `complete_equipe` | Completo Equipe | placeholder | 1500 | 20 | Equipe | Plano pago para equipes grandes |
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `relatorioGerado` | LONGTEXT NULL | Relatório IA editável |
+| `relatorioGeradoAt` | DATETIME(3) NULL | Data da última geração |
 
-> Preços (`priceCents`) são placeholders — ajustar via phpMyAdmin quando billing for definido.
+### Tabela `comentarios` (nova — v1.0)
 
-**SQL para inserir `basic_equipe` e `complete_equipe` (rodar no phpMyAdmin dev e produção):**
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `id` | INT PK | |
+| `demandaId` | INT | FK demandas |
+| `userId` | INT | FK users |
+| `companyId` | INT | isolamento tenant |
+| `conteudo` | TEXT | texto / transcrição |
+| `audioUrl` | VARCHAR(1000) NULL | URL Cloudinary (notas de voz) |
+| `tipo` | VARCHAR(20) | `NOTA` \| `AUDIO` \| `STATUS` |
+| `createdAt` | DATETIME(3) | |
+| `deletedAt` | DATETIME(3) NULL | soft delete |
+| `deletedBy` | INT NULL | |
+
+### Dados de referência — tabela `plans`
+
+| id | slug | name | priceCents | aiQuota | maxUsers | Tipo |
+|---|---|---|---|---|---|---|
+| 1 | `free` | Gratuito | 0 | 20 | 1 | Individual |
+| 2 | `pro` | Profissional | 1990 | NULL | 1 | Legado |
+| 3 | `team` | Equipe | 4990 | NULL | 5 | Legado |
+| 4 | `trial` | Trial | 0 | 100 | 5 | Especial |
+| 5 | `basic` | Básico | placeholder | 200 | 1 | Individual |
+| 6 | `complete` | Completo | placeholder | 500 | 1 | Individual |
+| 7 | `basic_equipe` | Básico Equipe | 14900 | 500 | 5 | Equipe |
+| 8 | `complete_equipe` | Completo Equipe | 29900 | 1500 | 20 | Equipe |
+
+> Preços `basic`/`complete` são placeholders — ajustar via phpMyAdmin quando billing for definido.
+
+### SQLs históricos (referência — já rodados em dev + prod)
+
 ```sql
--- Atualizar basic e complete para maxUsers=1 (individuais)
-UPDATE plans SET maxUsers=1 WHERE slug IN ('basic', 'complete');
+-- v1.0 — histórico de comentários + relatório IA
+CREATE TABLE `comentarios` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `demandaId` INT NOT NULL, `userId` INT NOT NULL, `companyId` INT NOT NULL,
+  `conteudo` TEXT NOT NULL, `audioUrl` VARCHAR(1000) NULL,
+  `tipo` VARCHAR(20) NOT NULL DEFAULT 'NOTA',
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `deletedAt` DATETIME(3) NULL, `deletedBy` INT NULL,
+  PRIMARY KEY (`id`),
+  INDEX `idx_comentarios_demanda` (`demandaId`),
+  INDEX `idx_comentarios_company` (`companyId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Inserir planos de equipe
-INSERT INTO plans (slug, name, priceCents, aiQuota, maxUsers, active) VALUES
-  ('basic_equipe',    'Básico Equipe',    14900,  500, 5,  1),
-  ('complete_equipe', 'Completo Equipe',  29900, 1500, 20, 1);
+ALTER TABLE `demandas`
+  ADD COLUMN `relatorioGerado`   LONGTEXT    NULL,
+  ADD COLUMN `relatorioGeradoAt` DATETIME(3) NULL;
 ```
-
-**SQL da coluna nova (avatarUrl — sprint configurações):**
-```sql
-ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatarUrl` VARCHAR(1000) NULL;
-```
-
-> ⚠️ Rodar nos dois bancos: `u822347350_demandoo_dev` (dev) e `u822347350_bd_demandoo` (produção)
 
 ---
 
@@ -119,75 +147,107 @@ ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatarUrl` VARCHAR(1000) NULL;
 | Drawer mobile (menu hamburguer) | `src/components/Sidebar.tsx` | ✅ |
 | Badge de quota de IA na sidebar | `src/components/Sidebar.tsx` | ✅ |
 | Proteção de rota (redirect → login) | `src/app/(app)/layout.tsx` | ✅ |
+| Nav: Início / Demandas / Tarefas / Ideias / Calendário / Relatórios / Nova captura / Configurações / Equipe | `src/components/Sidebar.tsx` | ✅ |
 
-### ✅ 4.3 Dashboard Principal (`/app`)
+### ✅ 4.3 Dashboard (`/app`)
 
 | Item | Status |
 |---|---|
-| Abas: Demandas / Tarefas / Ideias | ✅ |
+| 3 cards resumo (Demanda / Tarefa / Ideia) | ✅ |
+| Métricas por card: Total, Concluídas, No prazo, Vencidas | ✅ |
+| Métricas de Ideia: Total, Em exploração, Concluídas, Arquivadas | ✅ |
+| Botão único "Nova captura" | ✅ |
+| Banner de quota de IA (aviso quando ≤ 30%) | ✅ |
+| Cards clicáveis → `/app/lista?tipo=X` | ✅ |
+
+### ✅ 4.4 Lista (`/app/lista?tipo=X`)
+
+| Item | Status |
+|---|---|
+| Abas: Demandas / Tarefas / Ideias com badges de contagem | ✅ |
 | KPIs por tipo (4 cards por aba) | ✅ |
-| Lista com filtro de status + prioridade + busca textual | ✅ |
+| Filtro de status + prioridade + busca textual | ✅ |
+| Ordenação: Padrão / Prazo mais próximo / Prioridade / Recente | ✅ |
 | Modo card (Demandas/Ideias) com badges de status, prioridade, prazo, ações | ✅ |
 | Modo checklist (Tarefas) com toggle ABERTA ↔ CONCLUÍDA com 1 clique | ✅ |
-| Badge "IA" nos cards quando `aiProcessado = true` | ✅ |
-| Banner de quota de IA (aviso quando ≤ 30% restante) | ✅ |
 | Empty state por tipo | ✅ |
 
-### ✅ 4.4 Captura (`/app/nova`)
+### ✅ 4.5 Captura (`/app/nova`)
 
 | Modo | Campos | Status |
 |---|---|---|
 | **Voz** | Grava áudio → Whisper transcreve → GPT estrutura | ✅ |
-| **Texto + IA** | Texto livre → GPT estrutura (título, tipo, prioridade, prazo, ações, solicitante) | ✅ |
-| **Manual** | Título, descrição, tipo, prioridade, prazo, solicitante, delegado, próximas ações | ✅ |
+| **Texto + IA** | Texto livre → GPT estrutura | ✅ |
+| **Manual** | Título, descrição, tipo, prioridade, prazo, solicitante, delegado, ações | ✅ |
 
-**Pipeline de IA (voz e texto):**
-1. Upload do áudio para Cloudinary
-2. Transcrição via Whisper-1
-3. Estruturação via GPT-4o-mini (JSON: título, descrição, tipo, prioridade, prazo, ações, solicitante)
-4. Resolução de prazo relativo (BRT) via `parseDateBRT()`
-5. Match de solicitante com usuário da empresa (por primeiro nome)
-6. Criação da demanda + ações em transação
-
-**Controle de quota:**
-- Plano free: `aiQuota` fixo
-- Cada captura com IA incrementa `company.aiUsedTotal`
-- Quando `aiUsedTotal >= aiQuota`: IA bloqueada, modo manual liberado
-
-### ✅ 4.5 Detalhe da Demanda (`/app/[id]`)
+### ✅ 4.6 Detalhe (`/app/[id]`)
 
 | Item | Status |
 |---|---|
 | Badges de status + prioridade + IA + prazo vencido | ✅ |
-| Dropdown inline para trocar tipo | ✅ |
-| Edição inline de título (clique para editar) | ✅ |
-| Edição inline de descrição (clique para editar) | ✅ |
-| Painel "Editar detalhes" (collapse): prioridade, prazo, delegado | ✅ |
+| Botão de impressão unitária (ícone Printer → `/relatorios/imprimir?ids={id}`) | ✅ |
+| Edição inline de título, descrição, tipo, prioridade, prazo, delegado | ✅ |
 | Metadados: criado em, concluído em + duração, solicitante, delegado, prazo, áudio | ✅ |
-| Checklist de próximas ações (toggle feita, edição inline, soft delete, adicionar) | ✅ |
-| Transições de status contextuais (Iniciar, Concluir, Cancelar, Reabrir) | ✅ |
-| `concluidoAt` registrado ao concluir, limpo ao reabrir | ✅ |
-| Soft delete com confirmação inline | ✅ |
+| Checklist de ações (toggle, edição inline, soft delete, adicionar) | ✅ |
+| Transições de status contextuais (Iniciar / Concluir / Cancelar / Reabrir) | ✅ |
 | Export `.ics` (Google Calendar / Apple Calendar) | ✅ |
+| **Histórico de comentários** (texto + voz + auto-log de status) | ✅ |
+| **Relatório IA** (gerar / editar / imprimir) | ✅ |
 
-### ✅ 4.6 Calendário (`/app/calendario`)
+### ✅ 4.7 Histórico de Comentários
+
+| Item | Status |
+|---|---|
+| Nota de texto (inline, Ctrl+Enter) | ✅ |
+| Nota de voz (grava → upload Cloudinary → Whisper transcreve → salva texto + áudio) | ✅ |
+| Auto-log de mudanças de status (`tipo: STATUS`, itálico cinza) | ✅ |
+| Soft delete de comentários (só o autor) | ✅ |
+| Timeline cronológica com ícones por tipo | ✅ |
+
+### ✅ 4.8 Relatório IA por Item
+
+| Item | Status |
+|---|---|
+| Geração com GPT-4o-mini (abertura / desenvolvimento / conclusão) | ✅ |
+| Consome 1 crédito da quota de IA do plano | ✅ |
+| Salvamento automático após geração | ✅ |
+| Edição manual (textarea com markdown simples) | ✅ |
+| Botão "Imprimir" → página de impressão com relatório incluso | ✅ |
+| Botão "Regenerar" para atualizar após novas atualizações | ✅ |
+
+### ✅ 4.9 Relatórios (`/relatorios` + `/relatorios/imprimir`)
+
+| Item | Status |
+|---|---|
+| Seleção por checkbox com filtros (status, prioridade, busca, ordenação) | ✅ |
+| Abas por tipo com contagem | ✅ |
+| Barra inferior fixa com contador e botão "Gerar relatório" | ✅ |
+| Página de impressão limpa (sem sidebar) — CSS `@media print` | ✅ |
+| Cabeçalho com empresa, usuário e data de geração | ✅ |
+| Cada item: título, badges, descrição, checklist de ações, relatório IA (se gerado) | ✅ |
+| Botão "Imprimir / Salvar PDF" → `window.print()` (PDF nativo do browser) | ✅ |
+| Rota group `(print)` sem sidebar — layout mínimo com auth guard | ✅ |
+
+### ✅ 4.10 Calendário (`/app/calendario`)
 
 | Item | Status |
 |---|---|
 | Grid mensal com demandas com prazo | ✅ |
 | Navegação entre meses | ✅ |
 | Badges coloridos por tipo (violet/emerald/amber) | ✅ |
-| Data calculada em BRT | ✅ |
 
-### ✅ 4.7 API REST
+### ✅ 4.11 API REST
 
 | Endpoint | Métodos | Status |
 |---|---|---|
 | `/api/demandas` | GET, POST | ✅ |
-| `/api/demandas/[id]` | GET, PATCH, DELETE | ✅ |
+| `/api/demandas/[id]` | GET, PATCH (+ auto-log status), DELETE | ✅ |
 | `/api/demandas/[id]/acoes` | POST | ✅ |
 | `/api/demandas/[id]/acoes/[acaoId]` | PATCH, DELETE | ✅ |
 | `/api/demandas/[id]/calendar.ics` | GET | ✅ |
+| `/api/demandas/[id]/comentarios` | GET, POST | ✅ |
+| `/api/demandas/[id]/comentarios/[cId]` | DELETE | ✅ |
+| `/api/demandas/[id]/relatorio` | POST (gerar IA), PATCH (salvar edição) | ✅ |
 | `/api/upload/audio` | POST | ✅ |
 | `/api/upload/avatar` | POST | ✅ |
 | `/api/auth/cadastro` | POST | ✅ |
@@ -204,7 +264,7 @@ ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatarUrl` VARCHAR(1000) NULL;
 | `/api/admin/planos/[id]` | PATCH | ✅ |
 | `/api/cron/lembretes` | GET (bearer auth) | ✅ |
 
-### ✅ 4.8 Configurações da Conta (`/configuracoes`)
+### ✅ 4.12 Configurações (`/configuracoes`)
 
 | Item | Status |
 |---|---|
@@ -213,7 +273,7 @@ ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatarUrl` VARCHAR(1000) NULL;
 | Alteração de senha (suporta criar 1ª senha para Google) | ✅ |
 | Card de plano com countdown de trial | ✅ |
 
-### ✅ 4.9 Equipe (`/equipe`)
+### ✅ 4.13 Equipe (`/equipe`)
 
 | Item | Status |
 |---|---|
@@ -223,42 +283,41 @@ ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatarUrl` VARCHAR(1000) NULL;
 | Alterar role (ADMIN/USER) | ✅ |
 | Remover membro (soft delete) | ✅ |
 
-### ✅ 4.10 Painel Admin (`/admin`) — restrito a `SUPER_ADMIN_EMAIL`
+### ✅ 4.14 Painel Admin (`/admin`) — restrito a `SUPER_ADMIN_EMAIL`
 
 | Item | Status |
 |---|---|
 | Dashboard com KPIs globais | ✅ |
 | `/admin/empresas` — lista de tenants | ✅ |
-| `/admin/usuarios` — lista global de usuários | ✅ |
+| `/admin/usuarios` — lista global | ✅ |
 | `/admin/planos` — edição inline (preço, quota, max users, ativo) | ✅ |
-| `/admin/consumo` — OpenAI/Cloudinary/Cron + top 10 consumidores IA + links rápidos | ✅ |
+| `/admin/consumo` — OpenAI/Cloudinary/Cron + top 10 consumidores IA | ✅ |
 
-### ✅ 4.11 Cron Jobs
+### ✅ 4.15 Cron Jobs
 
 | Item | Status |
 |---|---|
-| Lembretes de prazo D-0 e D-1 (11h BRT diariamente) | ✅ |
+| Lembretes de prazo D-0 e D-1 (11h BRT) | ✅ |
 | Protegido por `Authorization: Bearer <CRON_SECRET>` | ✅ |
-| Log de cada execução em `cron_execucoes` (enviados, d0, d1, erros, detalhes) | ✅ |
-| Dispatcher externo: cron-job.org | ✅ |
+| Log de execução em `cron_execucoes` | ✅ |
 
-### ✅ 4.12 Páginas Públicas
+### ✅ 4.16 Páginas Públicas
 
 | Página | Status |
 |---|---|
 | `/` — Landing | ✅ |
 | `/como-funciona` — Guia completo do produto (SSG) | ✅ |
 | `/planos` — Tabela de planos individual + equipe | ✅ |
-| `/auth/login`, `/auth/cadastro`, `/auth/verificar`, `/auth/esqueci-senha`, `/auth/nova-senha`, `/auth/convite`, `/auth/confirmar-email` | ✅ |
+| Fluxos auth completos | ✅ |
 
-### ✅ 4.13 PWA / Identidade Visual
+### ✅ 4.17 PWA / Identidade Visual
 
 | Item | Status |
 |---|---|
-| Favicon ⚡ raio (32×32, gradiente violet) — `src/app/icon.tsx` | ✅ |
+| Favicon ⚡ (32×32) — `src/app/icon.tsx` | ✅ |
 | Apple Touch Icon (180×180) — `src/app/apple-icon.tsx` | ✅ |
-| SVG escalável para Android PWA — `public/icon.svg` | ✅ |
-| `manifest.json` configurado (any + maskable) | ✅ |
+| SVG PWA — `public/icon.svg` | ✅ |
+| `manifest.json` (any + maskable) | ✅ |
 
 ---
 
@@ -266,8 +325,8 @@ ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatarUrl` VARCHAR(1000) NULL;
 
 | Ambiente | Banco | URL |
 |---|---|---|
-| **Local** | `u822347350_demandoo_dev` (Hostinger) | `localhost:3000` |
-| **Produção** | `u822347350_bd_demandoo` (Hostinger) | `demandoo.net` |
+| **Local** | `u822347350_demandoo_dev` | `localhost:3000` |
+| **Produção** | `u822347350_bd_demandoo` | `demandoo.net` |
 
 **Variáveis de ambiente:**
 - `.env` → placeholders apenas (commitado, sem segredos)
@@ -276,89 +335,55 @@ ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatarUrl` VARCHAR(1000) NULL;
 
 **Portão pré-push:**
 ```bash
-npx tsc --noEmit && npx next build && git push origin main
+npx tsc --noEmit && npx next build
 ```
 
 ---
 
 ## 6. Backlog — O Que Ainda Será Criado
 
-### 🔲 6.1 Planos e Billing
+### 🔲 6.1 Planos e Billing (🔴 Alta — bloqueador de receita)
 
-| Item | Prioridade | Observações |
-|---|---|---|
-| Página `/planos` (já referenciada na sidebar) | Alta | Exibe planos free/paid, CTA de upgrade |
-| Integração com gateway de pagamento | Alta | Stripe ou Pagar.me |
-| Webhook de pagamento → atualiza `planId` e `planExpiresAt` | Alta | |
-| Controle de expiração de plano | Média | Banner de aviso + bloqueio suave |
+| Item | Prioridade |
+|---|---|
+| Integração com gateway de pagamento (Stripe ou Pagar.me) | 🔴 |
+| Webhook de pagamento → atualiza `planId` e `planExpiresAt` | 🔴 |
+| Controle de expiração de plano | 🔴 |
 
-### 🔲 6.2 Configurações da Conta
+### 🔲 6.2 LGPD (🔴 Alta — obrigação legal)
 
-| Item | Prioridade | Observações |
-|---|---|---|
-| Página `/configuracoes` (perfil do usuário) | Alta | Nome, e-mail, senha, foto |
-| Página `/configuracoes/empresa` | Alta | Nome, logo, slug da empresa |
-| Exportação de dados pessoais (LGPD) | Alta | Obrigação legal — gera ZIP com todos os dados |
-| Exclusão de conta (LGPD) | Alta | Soft delete + limpeza de dados pessoais |
+| Item | Prioridade |
+|---|---|
+| Exportação de dados pessoais (gera ZIP) | 🔴 |
+| Exclusão de conta (soft delete + limpeza) | 🔴 |
 
-### 🔲 6.3 Multi-usuário por Empresa
+### 🔲 6.3 Notificações
 
-| Item | Prioridade | Observações |
-|---|---|---|
-| Convidar membros da equipe (por e-mail) | Alta | Gera token de convite |
-| Gestão de membros (listar, remover, alterar role) | Alta | ADMIN vs USER |
-| Demandas delegadas para outros usuários da empresa | Média | Hoje `delegadoNome` é texto livre; futuro: vincular ao `userId` |
-| Visão de equipe: demandas de todos os membros (ADMIN) | Média | Filtro por `userId` no dashboard |
+| Item | Prioridade |
+|---|---|
+| E-mail: nova demanda delegada | 🟡 |
+| E-mail: demanda concluída (para solicitante) | 🟡 |
+| Notificações in-app (badge sidebar) | 🟡 |
 
-### ✅ 6.4 Notificações e Lembretes
+### 🔲 6.4 Melhorias de UX
 
-| Item | Prioridade | Observações |
-|---|---|---|
-| E-mail de lembrete de prazo (D-1 e D0) | Alta | ✅ Cron job via cron-job.org — `GET /api/cron/lembretes` protegido por `CRON_SECRET` |
-| Notificação de nova demanda delegada | Média | E-mail para o delegado |
-| Notificação de demanda concluída | Baixa | E-mail para o solicitante |
-| Notificações in-app (badge na sidebar) | Média | Tabela `notifications` |
-
-### 🔲 6.5 Relatórios e Analytics
-
-| Item | Prioridade | Observações |
-|---|---|---|
-| Página `/relatorios` | Média | |
-| Gráfico de demandas por status ao longo do tempo | Média | |
-| Tempo médio de resolução por tipo | Média | Usa `concluidoAt - createdAt` |
-| Ranking de solicitantes (quem mais demanda) | Baixa | |
-| Export CSV da lista de demandas | Média | Filtros aplicados → CSV |
-
-### 🔲 6.6 Melhorias de UX
-
-| Item | Prioridade | Observações |
-|---|---|---|
-| Paginação ou scroll infinito na lista (hoje limit 100) | Média | |
-| Ordenação customizada na lista (colunas clicáveis) | Média | |
-| Arquivar demandas concluídas (ocultar por padrão) | Média | |
-| Busca global (ctrl+K) com resultados em tempo real | Baixa | |
-| Drag & drop para reordenar ações da demanda | Baixa | |
-| Atalhos de teclado no detalhe (S para salvar, etc.) | Baixa | |
-
-### 🔲 6.7 Integrações
-
-| Item | Prioridade | Observações |
-|---|---|---|
-| Webhook de saída (notificar sistema externo quando status muda) | Baixa | |
-| API pública com autenticação por token | Baixa | Permite integração Zapier/n8n |
-| Captura via e-mail (endereço único por empresa) | Baixa | Recebe e-mail → cria demanda |
+| Item | Prioridade |
+|---|---|
+| Delegação vinculada a `userId` (hoje texto livre) | 🟡 |
+| Paginação nas listagens (hoje limit 100/200) | 🟡 |
+| Export CSV da lista com filtros aplicados | 🟡 |
+| Drag & drop para reordenar ações | 🟢 |
+| Busca global (Ctrl+K) | 🟢 |
 
 ---
 
 ## 7. Débitos Técnicos
 
-| Item | Impacto | Observações |
-|---|---|---|
-| SMTP: migrado para Hostinger (noreply@demandoo.net) | ✅ Resolvido | smtp.hostinger.com:465 (SSL) — funciona local e produção. **Atenção:** senha do mailbox não pode conter `#` ou outros especiais — parser de env var trunca a string → `535 auth failed`. Senha atual: só alphanum. |
-| `.env` tinha segredos commitados | 🟡 Resolvido | Corrigido em 2026-05-24 — agora só placeholders |
-| `delegadoNome` ainda é texto livre | 🟡 Médio | Não vincula ao `users.id`; melhorar quando multi-usuário chegar |
-| Queries sem paginação (take: 100) | 🟡 Médio | OK para MVP; escalar quando base crescer |
-| `new Date()` cru em `DetalheActions.tsx` (só para log, não salvo) | 🟢 Baixo | Não impacta dados |
+| Item | Impacto |
+|---|---|
+| `delegadoNome` ainda é texto livre | 🟡 Médio — não vincula ao `users.id` |
+| Queries sem paginação (take: 100/200) | 🟡 Médio — OK para MVP |
+| `new Date()` cru em `DetalheActions.tsx` (só para log client) | 🟢 Baixo |
 
 ---
 
@@ -366,43 +391,25 @@ npx tsc --noEmit && npx next build && git push origin main
 
 | Data | Versão | O que foi entregue |
 |---|---|---|
-| 2026-05-?? | v0.1 | Estrutura inicial: auth, schema, dashboard, captura voz + IA |
-| 2026-05-?? | v0.2 | Calendário, export .ics, modo texto + IA, filtros na lista |
-| 2026-05-24 | v0.3 | aiProcessado badge, concluidoAt + duração, delegadoNome, AcoesInterativas interativo |
-| 2026-05-24 | v0.4 | Captura manual completa: prioridade, prazo, solicitante, delegado, ações inline |
-| 2026-05-24 | v0.4.1 | Segurança: `.env` limpo de segredos; PIPELINE.md criado |
-| 2026-05-24 | v0.5 | SMTP Hostinger corrigido; Google OAuth → criar senha; login erros PT-BR |
-| 2026-05-24 | v0.6 | Página `/configuracoes`: perfil, avatar, troca de e-mail c/ verificação, senha, plano |
-| 2026-05-24 | v0.7 | Página `/planos` (individual + equipe), gestão de `/equipe` c/ convites por e-mail, lembretes de prazo por cron (D-0 e D-1), middleware corrigido |
-| 2026-05-25 | v0.8 | Página pública `/como-funciona` (guia do produto), classificação IA corrigida (voz/texto: IA decide o tipo, seletor só em manual), painel `/admin` completo (dashboard + empresas + usuários + planos com edição inline + consumo de recursos), API `PATCH /api/admin/planos/[id]`, log de execuções do cron em `cron_execucoes`, novo ícone ⚡ (raio) em todos os formatos, ordenação na lista (Padrão / Prazo / Prioridade / Recente) |
+| 2026-05-?? | v0.1–v0.5 | Auth, schema, captura, calendário, SMTP, Google OAuth |
+| 2026-05-24 | v0.6 | Configurações: perfil, avatar, e-mail, senha, plano |
+| 2026-05-24 | v0.7 | Planos, equipe + convites, cron lembretes D-0/D-1, middleware |
+| 2026-05-25 | v0.8 | Admin panel completo, cron log, ícone ⚡, classificação IA corrigida |
+| 2026-05-25 | v0.9 | Dashboard com 3 cards, lista separada `/app/lista`, ordenação, relatórios + impressão |
+| 2026-05-25 | v1.0 | Histórico de comentários (texto + voz + auto-log status), relatório IA por item editável |
 
 ---
 
-## 9. Próximas Entregas Planejadas
+## 9. Fluxo de Trabalho
 
-> Atualizar esta seção a cada sprint.
+**Regra absoluta:** Claude **nunca faz push sem autorização explícita do Ricardo.**
 
-### Sprint atual
-- Definir próximo sprint (sugestões: billing/pagamento, LGPD, ou notificações)
-
-### Backlog priorizado (atualizado 2026-05-25)
-- [ ] 🔴 Billing/pagamento (Stripe ou Pagar.me) — sem isso planos pagos não ativam
-- [ ] 🔴 Exportação de dados (LGPD) — obrigação legal
-- [ ] 🔴 Exclusão de conta (LGPD) — obrigação legal
-- [ ] 🟡 Notificação de nova demanda delegada (e-mail para o delegado)
-- [ ] 🟡 Notificação de demanda concluída (e-mail para o solicitante)
-- [ ] 🟡 Notificações in-app (badge na sidebar)
-- [ ] 🟡 Delegação vinculada a `userId` (hoje é texto livre)
-- [ ] 🟡 Paginação nas listagens (hoje limitadas a 100 registros)
-- [ ] 🟡 Relatórios / export CSV
-
-### Mudanças no fluxo de trabalho (2026-05-25)
-**Regra acordada:** Claude **nunca faz push sem autorização explícita**. Fluxo:
-1. Implementa as mudanças
-2. Roda `npx tsc --noEmit` + `npx next build` localmente
-3. Avisa que está pronto para teste
-4. Aguarda Ricardo dizer "pode subir" antes de qualquer `git push`
+1. Implementar + `npx tsc --noEmit` + `npx next build`
+2. Avisar Ricardo que está pronto para teste local
+3. Ricardo testa localmente
+4. Ricardo diz "pode subir" / "faz o push"
+5. Se houver mudança de schema: Ricardo roda SQL no phpMyAdmin **primeiro** (dev + prod), depois push
 
 ---
 
-*Este documento é mantido manualmente. Atualize sempre que uma entrega for concluída ou um novo item for identificado.*
+*Este documento é mantido manualmente. Atualize sempre que uma entrega for concluída.*

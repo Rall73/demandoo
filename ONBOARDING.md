@@ -3,7 +3,7 @@
 > **Este arquivo é o ponto de partida obrigatório para qualquer sessão de desenvolvimento no projeto demandoo.**
 > Leia integralmente antes de escrever qualquer linha de código.
 >
-> Última atualização: 2026-05-25 (v0.8)
+> Última atualização: 2026-05-25 (v1.0)
 
 ---
 
@@ -14,7 +14,7 @@
 
 **Problema que resolve:** Profissionais recebem pedidos, tarefas e ideias de forma caótica ao longo do dia (WhatsApp, reunião, voz, e-mail) e perdem coisas por falta de sistema rápido de captura.
 
-**Diferencial:** O usuário fala ou digita qualquer coisa e a IA (Whisper + GPT-4o-mini) estrutura automaticamente: título, tipo, prioridade, prazo, solicitante e próximas ações.
+**Diferencial:** O usuário fala ou digita qualquer coisa e a IA (Whisper + GPT-4o-mini) estrutura automaticamente: título, tipo, prioridade, prazo, solicitante e próximas ações. Cada item tem um histórico de atualizações e pode gerar um relatório narrativo completo com IA.
 
 **Multi-tenant:** cada empresa (`Company`) tem seu ambiente isolado. Convites e equipe via `/equipe`.
 
@@ -28,7 +28,7 @@
 | ORM | Prisma 6 (MySQL) |
 | Auth | Auth.js v5 (next-auth@beta) — JWT strategy |
 | Banco | MySQL/MariaDB via Hostinger |
-| IA | OpenAI Whisper (transcrição) + GPT-4o-mini (estruturação) |
+| IA | OpenAI Whisper (transcrição) + GPT-4o-mini (estruturação + relatórios) |
 | Armazenamento | Cloudinary (áudio + avatares) |
 | E-mail | Nodemailer + Hostinger SMTP (`smtp.hostinger.com:465`) |
 | UI | Tailwind CSS v4, lucide-react |
@@ -60,10 +60,11 @@ Hostinger prefixa banco e usuário com `u822347350_`. SQL alterado precisa ser r
 
 - `plans` — planos do produto
 - `companies` — tenants (uma empresa por cadastro)
-- `users` — usuários (com avatarUrl)
+- `users` — usuários (com `avatarUrl`)
 - `accounts` / `sessions` / `verification_tokens` — Auth.js
-- `demandas` — capturas (DEMANDA/TAREFA/IDEIA)
+- `demandas` — capturas (DEMANDA/TAREFA/IDEIA), inclui `relatorioGerado` e `relatorioGeradoAt`
 - `acoes_demanda` — checklist de ações por demanda
+- `comentarios` — histórico por demanda (NOTA / AUDIO / STATUS)
 - `cron_execucoes` — log de execuções de cron jobs
 
 ### Planos atuais (slug → quota IA)
@@ -89,24 +90,24 @@ Todas vivem no painel Hostinger → demandoo.net → Environment variables. Loca
 
 | Variável | Observação |
 |---|---|
-| `DATABASE_URL` | `mysql://USER:SENHA@srv####.hstgr.io:3306/BANCO` — usa hostname MySQL, não localhost |
+| `DATABASE_URL` | `mysql://USER:SENHA@srv####.hstgr.io:3306/BANCO` |
 | `AUTH_SECRET` | Configurado no painel |
-| `NEXTAUTH_URL` | `https://demandoo.net` (prod) ou `http://localhost:3000` (dev) |
+| `NEXTAUTH_URL` | `https://demandoo.net` (prod) / `http://localhost:3000` (dev) |
 | `NEXT_PUBLIC_APP_URL` | Igual ao acima |
 | `OPENAI_API_KEY` | Conta OpenAI do Ricardo |
-| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Conta Cloudinary do Ricardo |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Conta Cloudinary |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth via Google Cloud Console |
 | `SMTP_HOST` | `smtp.hostinger.com` |
 | `SMTP_PORT` | `465` (SSL) |
 | `SMTP_USER` | `noreply@demandoo.net` |
 | `SMTP_PASS` | **SOMENTE alphanum + `_`/`-`** — `#`, `@` etc. quebram parser de env var |
 | `EMAIL_FROM` | `demandoo <noreply@demandoo.net>` |
-| `CRON_SECRET` | Token bearer para `/api/cron/*` — gerado via `openssl rand -hex 32` |
+| `CRON_SECRET` | Token bearer para `/api/cron/*` |
 | `SUPER_ADMIN_EMAIL` | `rluize@gmail.com` — libera acesso a `/admin` |
 
 ---
 
-## 6. Estrutura de arquivos (atualizada)
+## 6. Estrutura de arquivos (v1.0)
 
 ```
 demandoo/
@@ -120,58 +121,74 @@ demandoo/
 │   ├── app/
 │   │   ├── layout.tsx                 # Root layout com Providers
 │   │   ├── page.tsx                   # Landing page pública
-│   │   ├── icon.tsx                   # Favicon 32×32 (Next.js ImageResponse)
+│   │   ├── icon.tsx                   # Favicon 32×32
 │   │   ├── apple-icon.tsx             # Apple Touch Icon 180×180
 │   │   ├── globals.css
-│   │   ├── como-funciona/             # Página pública (SSG) — guia do produto
-│   │   ├── planos/                    # Tabela de planos individual + equipe
+│   │   ├── como-funciona/             # Página pública (SSG)
+│   │   ├── planos/                    # Tabela de planos
 │   │   │
-│   │   ├── (app)/                     # Rotas autenticadas
+│   │   ├── (app)/                     # Rotas autenticadas (com Sidebar)
 │   │   │   ├── layout.tsx             # Verifica sessão + Sidebar
-│   │   │   ├── app/                   # Dashboard
-│   │   │   │   ├── page.tsx           # Hub (abas + KPIs + lista + ordenação)
-│   │   │   │   ├── DemandasList.tsx   # Filtros + ordenação client-side
+│   │   │   ├── app/
+│   │   │   │   ├── page.tsx           # Dashboard — 3 cards por tipo
+│   │   │   │   ├── lista/
+│   │   │   │   │   ├── page.tsx       # Lista filtrada por tipo
+│   │   │   │   │   └── DemandasList.tsx  # Filtros + ordenação client-side
 │   │   │   │   ├── nova/              # Captura (voz + texto + manual)
-│   │   │   │   ├── [id]/              # Detalhe
-│   │   │   │   └── calendario/        # Grid mensal
+│   │   │   │   ├── [id]/
+│   │   │   │   │   ├── page.tsx       # Detalhe + histórico + relatório IA
+│   │   │   │   │   ├── DetalheContent.tsx
+│   │   │   │   │   ├── DetalheActions.tsx
+│   │   │   │   │   ├── AcoesInterativas.tsx
+│   │   │   │   │   └── ComentariosSection.tsx  # Histórico + relatório IA
+│   │   │   │   └── calendario/
+│   │   │   ├── relatorios/
+│   │   │   │   ├── page.tsx           # Seleção + filtros + checkboxes
+│   │   │   │   └── RelatorioClient.tsx
 │   │   │   ├── configuracoes/         # Perfil, e-mail, senha, plano
 │   │   │   └── equipe/                # Gestão de membros + convites
 │   │   │
-│   │   ├── admin/                     # ADMIN — restrito a SUPER_ADMIN_EMAIL
-│   │   │   ├── layout.tsx             # Guarda de acesso
-│   │   │   ├── AdminSidebar.tsx
-│   │   │   ├── page.tsx               # Dashboard global
-│   │   │   ├── empresas/              # Lista de tenants
-│   │   │   ├── usuarios/              # Lista global
-│   │   │   ├── planos/                # Edição inline de planos
-│   │   │   └── consumo/               # OpenAI / Cloudinary / Cron / links
+│   │   ├── (print)/                   # Rotas de impressão (sem Sidebar)
+│   │   │   ├── layout.tsx             # Auth guard mínimo
+│   │   │   └── relatorios/imprimir/
+│   │   │       ├── page.tsx           # Página limpa CSS @media print
+│   │   │       └── PrintButton.tsx    # window.print() client component
 │   │   │
-│   │   ├── auth/                      # Login, cadastro, verificar, esqueci-senha, etc.
+│   │   ├── admin/                     # ADMIN — restrito a SUPER_ADMIN_EMAIL
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx               # Dashboard global
+│   │   │   ├── empresas/ / usuarios/ / planos/ / consumo/
+│   │   │
+│   │   ├── auth/                      # Login, cadastro, verificar, etc.
 │   │   │
 │   │   └── api/
-│   │       ├── admin/planos/[id]/route.ts      # PATCH (super-admin)
-│   │       ├── auth/                            # cadastro, esqueci-senha, nova-senha, aceitar-convite
-│   │       ├── configuracoes/                   # perfil, email, senha
-│   │       ├── cron/lembretes/route.ts          # GET (bearer auth) — D-0 e D-1
-│   │       ├── demandas/                        # CRUD + ações + calendar.ics
-│   │       ├── equipe/                          # listar, convidar, atualizar role, remover
-│   │       └── upload/                          # audio, avatar
+│   │       ├── admin/planos/[id]/     # PATCH (super-admin)
+│   │       ├── auth/                  # cadastro, esqueci-senha, nova-senha, aceitar-convite
+│   │       ├── configuracoes/         # perfil, email, senha
+│   │       ├── cron/lembretes/        # GET (bearer auth) — D-0 e D-1
+│   │       ├── demandas/
+│   │       │   ├── route.ts           # GET + POST
+│   │       │   └── [id]/
+│   │       │       ├── route.ts       # GET + PATCH (+ auto-log status) + DELETE
+│   │       │       ├── acoes/         # POST + [acaoId] PATCH/DELETE
+│   │       │       ├── calendar.ics/  # GET
+│   │       │       ├── comentarios/   # GET + POST + [cId] DELETE
+│   │       │       └── relatorio/     # POST (gerar IA) + PATCH (salvar)
+│   │       ├── equipe/                # listar, convidar, atualizar, remover
+│   │       └── upload/                # audio, avatar
 │   │
 │   ├── auth/                          # NextAuth config + types
 │   ├── components/                    # Sidebar, Providers
 │   └── lib/
 │       ├── prisma.ts                  # Singleton
-│       ├── date.ts                    # Helpers BRT (hojeNoBrasil, etc.)
-│       ├── demandas.ts                # Constantes visuais (TIPO_LABEL, etc.)
+│       ├── date.ts                    # Helpers BRT
 │       ├── openai.ts                  # Lazy singleton
 │       ├── cloudinary.ts              # Upload + delete
-│       └── email.ts                   # Nodemailer transporter + templates
+│       └── email.ts                   # Nodemailer + templates
 │
-├── CLAUDE.md                          # Convenções (importa AGENTS.md)
-├── AGENTS.md                          # Aviso sobre Next.js 16
+├── CLAUDE.md / AGENTS.md             # Convenções obrigatórias
 ├── PIPELINE.md                        # Histórico de versões + backlog
-├── ONBOARDING.md                      # Este arquivo
-└── FUNCIONALIDADES-A-PORTAR.md        # Histórico (já cumprido)
+└── ONBOARDING.md                      # Este arquivo
 ```
 
 ---
@@ -182,175 +199,136 @@ demandoo/
 
 | Modo | UI | Tipo escolhido por |
 |---|---|---|
-| **Voz** | Grava áudio → Whisper transcreve → GPT estrutura | **IA** (automático) |
-| **Texto + IA** | Campo de texto livre → GPT estrutura | **IA** (automático) |
-| **Manual** | Formulário completo com todos os campos | **Usuário** (seletor explícito) |
+| **Voz** | Grava áudio → Whisper → GPT estrutura | **IA** |
+| **Texto + IA** | Texto livre → GPT estrutura | **IA** |
+| **Manual** | Formulário completo | **Usuário** |
 
-> ⚠️ **Regra:** O seletor de tipo (Demanda / Tarefa / Ideia) só aparece no modo **Manual**. Nos modos Voz e Texto+IA, a IA classifica e o `tipo` enviado pelo front é ignorado.
+> ⚠️ O seletor de tipo só aparece no modo **Manual**. Nos outros, a IA classifica.
 
-### Árvore de decisão de tipo (no prompt GPT)
+### Pipeline de IA (POST /api/demandas)
 
-```
-Tem expressão de ideia OU tom exploratório/hipotético?  → IDEIA
-Senão, pedido simples só de quem fala, sem terceiros?   → TAREFA
-Senão (qualquer outro caso, inclusive dúvida)           → DEMANDA
-```
-
-- **💡 IDEIA** — "tive uma ideia", "e se...", "imagina se", tom exploratório. Geralmente sem prazo, prioridade BAIXA.
-- **✅ TAREFA** — pedido simples, só envolve quem fala, máx 1-2 ações. Ex: "comprar pão amanhã".
-- **📋 DEMANDA** (padrão/fallback) — solicitante terceiro, contexto narrativo, múltiplos passos.
-
-### Pipeline de IA (POST /api/demandas — modos Voz e Texto+IA)
-
-1. Verifica quota (`company.aiUsedTotal >= plan.aiQuota` → retorna `aiBlocked`)
-2. Se `audioUrl` → fetch → Whisper-1 → transcrição (pt)
-3. GPT-4o-mini com `response_format: json_object` retorna `{ titulo, descricao, tipo, prioridade, prazo, acoes, solicitanteNome }`
-4. Tipo: vem da IA (não do front, exceto modo manual)
-5. Prazo: GPT resolve "amanhã"/"sexta" → `YYYY-MM-DD` → `parseDateBRT()` (meia-noite BRT = `T03:00:00Z`)
-6. Solicitante: match por primeiro nome em `users` da mesma `company`
-7. Salva demanda + ações em transação (`aiProcessado: true`)
-8. Incrementa `company.aiUsedTotal`
+1. Verifica quota (`aiUsedTotal >= aiQuota` → bloqueado)
+2. Se áudio → Whisper-1 transcreve
+3. GPT-4o-mini retorna JSON: `{ titulo, descricao, tipo, prioridade, prazo, acoes, solicitanteNome }`
+4. Prazo: GPT resolve relativos → `YYYY-MM-DD` → `parseDateBRT()` (meia-noite BRT = `T03:00:00Z`)
+5. Solicitante: match por primeiro nome nos `users` da empresa
+6. Salva demanda + ações, incrementa `aiUsedTotal`
 
 ---
 
-## 8. Autenticação (Auth.js v5)
+## 8. Histórico de Comentários + Relatório IA
+
+### Comentários (`/api/demandas/[id]/comentarios`)
+
+- **NOTA**: texto digitado pelo usuário
+- **AUDIO**: gravação → upload Cloudinary → Whisper transcreve → salva texto + audioUrl
+- **STATUS**: criado automaticamente no PATCH da demanda quando o status muda
+
+### Relatório IA (`/api/demandas/[id]/relatorio`)
+
+- **POST**: GPT-4o-mini recebe dados completos (demanda + acoes + comentarios) e gera relatório em markdown (Abertura / Desenvolvimento / Conclusão). Consome 1 crédito de quota.
+- **PATCH**: salva edição manual do texto
+- Armazenado em `demandas.relatorioGerado`
+- Exibido na página de detalhe e na impressão
+
+---
+
+## 9. Autenticação (Auth.js v5)
 
 - **Estratégia:** JWT
-- **Providers:** Credentials (e-mail + senha) + Google OAuth
+- **Providers:** Credentials + Google OAuth
 - **`trustHost: true`** — obrigatório na Hostinger (proxy reverso)
-- **Google:** Redirect URI `https://demandoo.net/api/auth/callback/google`. Primeiro acesso cria company + user. `allowDangerousEmailAccountLinking: true`.
-- **Credentials:** verifica `emailVerified`, `active`, `company.active`
 - **JWT payload:** `id, companyId, companyName, planSlug, aiQuota, aiUsedTotal, role, avatarUrl, planExpiresAt`
-
-### Fluxos cobertos
-
-- ✅ Cadastro por e-mail com verificação (token 24h)
-- ✅ Esqueci minha senha (token 1h) + nova senha
-- ✅ Google OAuth com criação automática de empresa
-- ✅ Criar senha pela 1ª vez (contas Google que esqueceram a senha)
-- ✅ Trocar e-mail com verificação no novo endereço
-- ✅ Aceitar convite de equipe (token único)
 
 ---
 
-## 9. Convenções obrigatórias
+## 10. Convenções obrigatórias
 
 ### Banco
-- Soft delete em tudo: `deletedAt DateTime?` + `deletedBy Int?`
-- Toda query filtra `deletedAt: null`
-- Toda tabela de domínio tem `companyId` (isolamento de tenant)
-- Schema alterado → SQL manual → Ricardo roda no phpMyAdmin **nos dois bancos** (dev + prod) → depois o código
+- Soft delete: `deletedAt DateTime?` + `deletedBy Int?`; toda query filtra `deletedAt: null`
+- `companyId` em toda tabela de domínio (isolamento de tenant)
+- Schema alterado → SQL manual → Ricardo roda no phpMyAdmin **nos dois bancos** → depois o código
 
 ### Fuso horário
-- Servidor UTC, usuários em Brasília (UTC-3, sem horário de verão)
+- Servidor UTC, usuários em Brasília (UTC-3)
 - **Nunca** `new Date()` cru em API para "hoje"
 - Usar `src/lib/date.ts`: `hojeISOBrasil()`, `hojeNoBrasil()`, `parseDateBRT()`
-- Prazo armazenado como meia-noite BRT = `T03:00:00Z` em UTC
 
 ### UI
-- Ícones: sempre `lucide-react` (nunca emoji como ícone de nav/ação)
+- Ícones: sempre `lucide-react`
 - Todo `<input>` e `<select>`: obrigatório `text-gray-800 bg-white`
 - Paleta: violet-600 (DEMANDA/brand), emerald (TAREFA), amber (IDEIA)
 
 ### Middleware
-- Arquivo **obrigatoriamente** `src/middleware.ts` — qualquer outro nome é ignorado pelo Next.js
-- Build correto exibe `ƒ Proxy (Middleware)` no output
-- `/api/cron/*` isento de autenticação (senão 307 quebra o cron)
-- Next.js 16 mostra warning pedindo `proxy.ts` — ignorar, regra do projeto é `middleware.ts`
+- Arquivo **obrigatoriamente** `src/middleware.ts`
+- `/api/cron/*` isento de autenticação
+- Next.js 16 exibe warning pedindo `proxy.ts` — ignorar, regra é `middleware.ts`
 
-### Cron
-- Protegido por `Authorization: Bearer <CRON_SECRET>` (não por sessão)
-- URL sempre HTTPS — HTTP gera 301 que o cron-job.org não segue
-- Toda execução registrada em `cron_execucoes`
-
-### E-mail (SMTP Hostinger)
-- `smtp.hostinger.com` porta 465 (SSL, `secure: true`)
-- **Senha SMTP: só alphanum + `_`/`-`** — `#` é interpretado como comentário em parser de env var → `535 auth failed`
-- Transporter criado dentro de função (`makeTransporter()`), nunca singleton de módulo
-- Contas Google sem senha: usar `sendDefinePasswordEmail` (criar 1ª senha), não reset
+### E-mail
+- `smtp.hostinger.com:465` (SSL)
+- **Senha SMTP: só alphanum + `_`/`-`** — `#` é comentário em env var
+- Transporter criado dentro de função, nunca singleton de módulo
 
 ### Deploy
-- Portão pré-push: `npx tsc --noEmit` → `npx next build`
-- **Nunca push sem autorização explícita do Ricardo** (regra acordada em 2026-05-25)
+- **Nunca push sem autorização explícita do Ricardo**
+- Portão: `npx tsc --noEmit` + `npx next build`
 - Commit semântico via HEREDOC, arquivos nomeados (nunca `git add -A`)
-- Sem segredos no repo
-- Nunca `output: 'standalone'` no `next.config` — quebra o Passenger
+- Nunca `output: 'standalone'` no `next.config`
 
 ---
 
-## 10. Controle de acesso
+## 11. Controle de acesso
 
 | Tipo de usuário | Acesso |
 |---|---|
 | Anônimo | Páginas públicas (`/`, `/como-funciona`, `/planos`, `/auth/*`) |
-| Usuário autenticado (USER) | Tudo em `/app/*`, `/configuracoes`, `/equipe` (só ver) |
+| Usuário autenticado (USER) | `/app/*`, `/relatorios`, `/configuracoes`, `/equipe` (só ver) |
 | ADMIN da empresa | + `/equipe` com poder de convidar/remover/alterar role |
-| Super admin (`SUPER_ADMIN_EMAIL`) | + `/admin/*` (visão global de todas as empresas) |
-
-A guarda do super admin está em `src/app/admin/layout.tsx` (verifica `session.user.email === process.env.SUPER_ADMIN_EMAIL`).
+| Super admin (`SUPER_ADMIN_EMAIL`) | + `/admin/*` (visão global) |
 
 ---
 
-## 11. Decisões de design importantes
+## 12. Decisões de design
 
-### Por que um único modelo Demanda para três tipos?
-DEMANDA, TAREFA e IDEIA usam a mesma tabela com coluna `tipo ENUM`. Permite pipeline único, promoção entre tipos, calendário sem JOIN, IA classifica na criação.
-
-### Por que freemium vitalício (não mensal)?
-20 capturas para sempre no free — não 20 por mês. O pool vitalício cria urgência real de conversão quando o hábito está formado.
-
-### Por que .ics em vez de Google Calendar OAuth?
-Google OAuth bidirecional é complexo. O .ics funciona com qualquer cliente (Google, Apple, Outlook) com zero dependência.
-
-### Por que não `output: 'standalone'` no Next.js?
-Quebra o Passenger da Hostinger — assets estáticos ficam com 404.
-
-### Por que `src/middleware.ts` e não outro nome?
-Next.js só carrega middleware desse nome exato. `proxy.ts` é ignorado silenciosamente. Build confirma com `ƒ Proxy (Middleware)`.
-
-### Por que SUPER_ADMIN_EMAIL em vez de coluna no banco?
-Decisão pragmática: o super admin é uma única pessoa (Ricardo). Adicionar coluna `isPlatformAdmin` no User exigiria migração + checks. Variável de ambiente é suficiente e desliga em dev se não setada.
+| Decisão | Motivo |
+|---|---|
+| Único model `Demanda` para 3 tipos | Pipeline único, promoção entre tipos, calendário sem JOIN |
+| Freemium vitalício (não mensal) | Pool vitalício cria urgência real de conversão |
+| `.ics` em vez de Google Calendar OAuth | Zero dependência, funciona em qualquer cliente |
+| `src/middleware.ts` fixo | Next.js só carrega esse nome — `proxy.ts` é ignorado silenciosamente |
+| `SUPER_ADMIN_EMAIL` em env var | Ricardo é único super-admin — coluna no banco seria over-engineering |
+| `(print)` route group | Permite layout sem sidebar para páginas de impressão, mantendo auth guard |
 
 ---
 
-## 12. Comandos úteis
+## 13. Comandos úteis
 
 ```bash
 # Desenvolvimento local
 cd C:\Users\Ricardo\Blog\demandoo
 npm run dev
 
-# Antes de informar Ricardo que algo está pronto
+# Antes de avisar Ricardo
 npx tsc --noEmit
 npx next build
 
-# Após Ricardo autorizar
-git add <arquivos-nomeados>
-git commit -m "$(cat <<'EOF'
-feat: descrição
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-EOF
-)"
-git push origin main
-
 # Após mudança de schema
 npx prisma generate
-# E entregar o SQL para Ricardo rodar nos dois bancos
+# Entregar SQL para Ricardo rodar nos dois bancos
 ```
 
 ---
 
-## 13. Como iniciar uma nova sessão Claude Code neste projeto
+## 14. Como iniciar uma nova sessão
 
 ```bash
 cd C:\Users\Ricardo\Blog\demandoo
-# Iniciar Claude Code aqui — ele lê CLAUDE.md e AGENTS.md automaticamente
-# Memórias do projeto estão em ~/.claude/projects/C--Users-Ricardo-Blog-demandoo/memory/
+# Claude Code lê CLAUDE.md e AGENTS.md automaticamente
+# Memórias: ~/.claude/projects/C--Users-Ricardo-Blog-demandoo/memory/
 ```
 
-**Antes de qualquer mudança:** ler este ONBOARDING e o `PIPELINE.md` para entender o estado atual.
+**Antes de qualquer mudança:** ler ONBOARDING.md + PIPELINE.md para entender o estado atual.
 
 ---
 
-*Última atualização: 2026-05-25 — v0.8 (admin panel + cron logging + novo ícone + ordenação)*
+*Última atualização: 2026-05-25 — v1.0 (histórico + relatório IA + relatórios + dashboard)*
