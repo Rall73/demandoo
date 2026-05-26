@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Mic, Zap, Calendar, CheckSquare, Lightbulb, Inbox, ArrowRight, Shield, Lock } from "lucide-react"
+import { Mic, Zap, CheckSquare, Lightbulb, Inbox, ArrowRight, Shield, Lock, FileText } from "lucide-react"
 
 export default function LandingPage() {
   return (
@@ -58,7 +58,7 @@ export default function LandingPage() {
             Já tenho conta
           </Link>
         </div>
-        <p className="text-sm text-slate-400 mt-4">15 capturas com IA grátis • Sem cartão de crédito</p>
+        <p className="text-sm text-slate-400 mt-4">20 capturas com IA grátis • Sem cartão de crédito</p>
       </section>
 
       {/* Como funciona */}
@@ -83,7 +83,7 @@ export default function LandingPage() {
               {
                 icon: CheckSquare,
                 title: "Execute com clareza",
-                desc: "Demandas, tarefas e ideias no mesmo lugar. Calendário integrado. Nada se perde.",
+                desc: "Acompanhe pelo histórico, adicione notas por texto ou voz, e peça à IA um relatório completo da jornada — editável e imprimível.",
                 color: "bg-emerald-100 text-emerald-600",
               },
             ].map(({ icon: Icon, title, desc, color }) => (
@@ -102,7 +102,7 @@ export default function LandingPage() {
       {/* Tipos de captura */}
       <section className="py-20 max-w-5xl mx-auto px-6">
         <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">Tudo em um só lugar</h2>
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-3 gap-4 mb-4">
           <div className="rounded-2xl border-2 border-violet-200 bg-violet-50 p-6">
             <Inbox size={28} className="text-violet-600 mb-3" strokeWidth={2} />
             <h3 className="font-bold text-violet-900 mb-2">Demandas</h3>
@@ -119,6 +119,18 @@ export default function LandingPage() {
             <p className="text-amber-700 text-sm">Insights e conceitos para explorar depois — capturados agora, perdidos nunca.</p>
           </div>
         </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-6">
+            <Mic size={28} className="text-slate-600 mb-3" strokeWidth={2} />
+            <h3 className="font-bold text-slate-900 mb-2">Histórico por item</h3>
+            <p className="text-slate-600 text-sm">Adicione notas de texto ou áudio a qualquer demanda. Mudanças de status são registradas automaticamente.</p>
+          </div>
+          <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-6">
+            <FileText size={28} className="text-slate-600 mb-3" strokeWidth={2} />
+            <h3 className="font-bold text-slate-900 mb-2">Relatório IA</h3>
+            <p className="text-slate-600 text-sm">Com um clique, a IA gera um relatório narrativo completo — abertura, histórico e conclusão. Editável e imprimível.</p>
+          </div>
+        </div>
       </section>
 
       {/* Planos */}
@@ -129,30 +141,30 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-4">
             {[
               {
-                name: "Explorador",
+                name: "Gratuito",
                 price: "Grátis",
                 desc: "Para conhecer o produto",
-                features: ["15 capturas com IA", "Modo manual ilimitado", "Demandas + Tarefas + Ideias", "Calendário"],
+                features: ["20 capturas com IA", "Modo manual ilimitado", "Histórico + Relatório IA", "Calendário e export .ics"],
                 cta: "Começar grátis",
                 href: "/auth/cadastro",
                 highlight: false,
               },
               {
-                name: "Profissional",
-                price: "R$ 19,90/mês",
+                name: "Completo",
+                price: "Em breve",
                 desc: "Para uso diário intenso",
-                features: ["IA ilimitada", "Captura por voz", "Calendário + .ics", "Exportação de dados", "Suporte prioritário"],
-                cta: "Assinar Pro",
-                href: "/auth/cadastro?plano=pro",
+                features: ["500 capturas com IA", "Captura por voz", "Histórico + Relatório IA", "Lembretes de prazo por e-mail", "Suporte prioritário"],
+                cta: "Falar com a equipe",
+                href: "mailto:contato@demandoo.net",
                 highlight: true,
               },
               {
-                name: "Equipe",
-                price: "R$ 49,90/mês",
+                name: "Básico Equipe",
+                price: "Em breve",
                 desc: "Para times de até 5",
-                features: ["Tudo do Pro", "Até 5 usuários", "Delegação de demandas", "Painel da equipe"],
-                cta: "Assinar Equipe",
-                href: "/auth/cadastro?plano=team",
+                features: ["500 capturas com IA", "Até 5 usuários", "Histórico + Relatório IA", "Delegação entre membros"],
+                cta: "Falar com a equipe",
+                href: "mailto:contato@demandoo.net",
                 highlight: false,
               },
             ].map(({ name, price, desc, features, cta, href, highlight }) => (
@@ -188,6 +200,10 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+          <p className="text-center text-sm text-slate-400 mt-6">
+            Ver todos os planos e comparar funcionalidades →{" "}
+            <Link href="/planos" className="text-violet-500 hover:underline font-medium">Tabela completa</Link>
+          </p>
         </div>
       </section>
 

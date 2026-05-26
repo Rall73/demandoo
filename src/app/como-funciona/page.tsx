@@ -3,7 +3,7 @@ import {
   Inbox, Mic, Sparkles, PenLine, CheckSquare, Lightbulb,
   Calendar, Settings, Users, ArrowRight, Check, Zap,
   BookOpen, MessageSquare, Clock, Tag, ListChecks,
-  LayoutDashboard, ChevronRight, Star,
+  LayoutDashboard, ChevronRight, Star, FileText, History,
 } from "lucide-react"
 
 export const metadata = {
@@ -132,6 +132,7 @@ export default function ComoFuncionaPage() {
             <a href="#conceitos" className="hover:text-slate-900 transition-colors">Conceitos</a>
             <a href="#captura" className="hover:text-slate-900 transition-colors">Como capturar</a>
             <a href="#funcionalidades" className="hover:text-slate-900 transition-colors">Funcionalidades</a>
+            <a href="#historico" className="hover:text-slate-900 transition-colors">Histórico & IA</a>
             <a href="#planos" className="hover:text-slate-900 transition-colors">Planos</a>
           </div>
           <div className="flex items-center gap-3">
@@ -173,6 +174,7 @@ export default function ComoFuncionaPage() {
                 { href: "#captura",         label: "Modos de captura: Voz, Texto + IA e Manual" },
                 { href: "#ia",              label: "Como a IA classifica automaticamente" },
                 { href: "#funcionalidades", label: "Funcionalidades de cada página" },
+                { href: "#historico",       label: "Histórico e Relatório IA por item" },
                 { href: "#planos",          label: "Planos e quotas de IA" },
                 { href: "#faq",             label: "Perguntas frequentes" },
               ].map(({ href, label }) => (
@@ -481,11 +483,12 @@ export default function ComoFuncionaPage() {
               icon: LayoutDashboard,
               color: "bg-violet-100 text-violet-600",
               title: "Dashboard principal (/app)",
-              desc: "A central de tudo. Três abas — Demandas, Tarefas e Ideias — com KPIs de status no topo (abertas, em andamento, concluídas). Filtre por status, prioridade ou busque pelo título. Tarefas aparecem em modo checklist para marcar como feita com um toque.",
+              desc: "A central de tudo. Três cards — Demandas, Tarefas e Ideias — com métricas de status (total, concluídas, no prazo, vencidas). Clique em qualquer card para abrir a lista filtrada por tipo (/app/lista), onde você filtra, ordena e busca.",
               items: [
-                "Filtros por status e prioridade",
+                "Cards com métricas por tipo",
+                "Lista com filtros por status e prioridade",
                 "Busca textual em tempo real",
-                "Checklist rápido para Tarefas",
+                "Ordenação por padrão, prazo, prioridade ou recente",
                 "Badge 'IA' nos itens processados pela IA",
                 "Aviso de quota de IA quando restam menos de 30%",
               ],
@@ -494,13 +497,14 @@ export default function ComoFuncionaPage() {
               icon: ListChecks,
               color: "bg-slate-100 text-slate-600",
               title: "Detalhe da demanda (/app/[id])",
-              desc: "Página completa de um item. Edite qualquer campo inline — título, descrição, prioridade, prazo, delegado. Gerencie o checklist de próximas ações. Mude o status com os botões contextuais (Iniciar, Concluir, Cancelar, Reabrir).",
+              desc: "Página completa de um item. Edite qualquer campo inline — título, descrição, prioridade, prazo, delegado. Gerencie o checklist de próximas ações. Mude o status com os botões contextuais. Acompanhe o histórico e gere o relatório IA.",
               items: [
                 "Edição inline de título e descrição (clique para editar)",
                 "Dropdown de tipo editável",
                 "Painel de detalhes colapsável (prazo, prioridade, delegado)",
                 "Checklist de próximas ações com toggle, edição e exclusão",
-                "Histórico: criado em, concluído em + duração",
+                "Histórico completo: notas de texto, notas de voz e log de status",
+                "Relatório IA gerado com um clique — editável e imprimível",
                 "Export .ics para Google Calendar / Apple Calendar",
                 "Soft delete com confirmação",
               ],
@@ -516,6 +520,20 @@ export default function ComoFuncionaPage() {
                 "Badges coloridos por tipo",
                 "Clique no item → vai para o detalhe",
                 "Datas calculadas em horário de Brasília",
+              ],
+            },
+            {
+              icon: FileText,
+              color: "bg-violet-100 text-violet-600",
+              title: "Relatórios (/relatorios)",
+              desc: "Selecione demandas, tarefas ou ideias com filtros e exporte um relatório em PDF via impressão nativa do navegador. Cada item pode incluir seu histórico de atualizações e o relatório gerado pela IA.",
+              items: [
+                "Seleção individual ou em grupo por checkbox",
+                "Filtros por status, prioridade e busca",
+                "Ordenação por padrão, prazo ou prioridade",
+                "Abas por tipo: Demanda, Tarefa, Ideia",
+                "Impressão limpa via CSS @media print",
+                "Inclui histórico e relatório IA quando disponíveis",
               ],
             },
             {
@@ -565,6 +583,88 @@ export default function ComoFuncionaPage() {
               </div>
             </div>
           ))}
+        </div>
+      </Section>
+
+      {/* ── Seção 4b: Histórico e Relatório IA ── */}
+      <Section id="historico">
+        <SectionTitle
+          eyebrow="Histórico e Relatório IA"
+          title="Acompanhe a jornada completa de cada item"
+          subtitle="Cada demanda, tarefa ou ideia tem um histórico vivo — com notas, áudios e logs automáticos de status. E a IA resume tudo em segundos."
+        />
+
+        <div className="grid md:grid-cols-3 gap-5 mb-8">
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
+              <MessageSquare size={20} className="text-blue-600" strokeWidth={2} />
+            </div>
+            <h4 className="font-bold text-blue-900 mb-2">Nota de texto</h4>
+            <p className="text-sm text-blue-700 leading-relaxed">
+              Digite qualquer atualização, observação ou complemento diretamente no histórico do item. Pressione Ctrl+Enter para enviar.
+            </p>
+          </div>
+          <div className="bg-violet-50 border border-violet-200 rounded-2xl p-5">
+            <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center mb-4">
+              <Mic size={20} className="text-violet-600" strokeWidth={2} />
+            </div>
+            <h4 className="font-bold text-violet-900 mb-2">Nota de voz</h4>
+            <p className="text-sm text-violet-700 leading-relaxed">
+              Grave um áudio diretamente na página. O Whisper transcreve automaticamente e salva o texto no histórico, junto com o áudio original.
+            </p>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+            <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center mb-4">
+              <History size={20} className="text-slate-600" strokeWidth={2} />
+            </div>
+            <h4 className="font-bold text-slate-900 mb-2">Log de status</h4>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Toda mudança de status (ex: "Aberto → Em andamento") é registrada automaticamente com data e hora, sem nenhuma ação do usuário.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white border-2 border-violet-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center gap-4 px-6 py-5 bg-violet-50 border-b border-violet-200">
+            <div className="w-10 h-10 bg-violet-600 rounded-xl flex items-center justify-center shrink-0">
+              <Zap size={20} className="text-white" strokeWidth={2} />
+            </div>
+            <div>
+              <h3 className="font-bold text-violet-900">Relatório IA — resumo narrativo completo</h3>
+              <p className="text-sm text-violet-600">GPT-4o-mini lê tudo e escreve em segundos</p>
+            </div>
+            <span className="ml-auto text-xs bg-violet-100 text-violet-700 font-semibold px-2.5 py-1 rounded-full shrink-0">Consome 1 crédito de IA</span>
+          </div>
+          <div className="px-6 py-5">
+            <p className="text-sm text-slate-600 leading-relaxed mb-4">
+              Na página de detalhe de qualquer item, clique em <strong>"Gerar relatório"</strong>. A IA recebe todos os dados
+              — título, descrição, ações, histórico de notas e logs — e produz um relatório estruturado em três partes:
+            </p>
+            <div className="grid md:grid-cols-3 gap-3 mb-5">
+              {[
+                { title: "Abertura", desc: "Contexto, tipo, prioridade, solicitante e prazo" },
+                { title: "Desenvolvimento", desc: "Histórico completo: cada nota, áudio transcrito e mudança de status, em ordem cronológica" },
+                { title: "Conclusão", desc: "Status atual, ações pendentes e avaliação geral do ciclo" },
+              ].map(({ title, desc }) => (
+                <div key={title} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                  <p className="font-semibold text-slate-800 text-sm mb-1">{title}</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">{desc}</p>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {[
+                "O texto gerado fica salvo na demanda e pode ser editado manualmente",
+                "O relatório é exibido na impressão individual e nos relatórios em grupo",
+                "É possível regenerar o relatório a qualquer momento com novos dados",
+              ].map((item) => (
+                <div key={item} className="flex items-start gap-2 text-sm text-slate-600">
+                  <Check size={13} className="text-emerald-500 mt-0.5 shrink-0" strokeWidth={2.5} />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </Section>
 
@@ -771,6 +871,22 @@ export default function ComoFuncionaPage() {
             {
               q: "Como exporto uma demanda para o Google Calendar?",
               a: "Na página de detalhe de qualquer demanda com prazo definido, clique em '+ Calendário' ao lado do prazo. Isso baixa um arquivo .ics que pode ser importado no Google Calendar, Apple Calendar ou Outlook.",
+            },
+            {
+              q: "O que é o histórico de um item e como adicionar uma nota?",
+              a: "Cada demanda, tarefa ou ideia tem uma linha do tempo na página de detalhe. Você pode adicionar notas de texto (campo na parte inferior, Ctrl+Enter para enviar) ou notas de voz (botão de microfone — o Whisper transcreve o áudio automaticamente). Mudanças de status são registradas automaticamente, sem ação necessária.",
+            },
+            {
+              q: "O relatório gerado pela IA pode ser editado?",
+              a: "Sim. Depois de gerar, o texto fica em modo de exibição com um botão 'Editar'. Clique para abrir a caixa de texto, faça os ajustes e salve. O relatório editado é exibido nas impressões e relatórios em grupo. Você também pode regenerar com novos dados clicando em 'Gerar novamente'.",
+            },
+            {
+              q: "Gerar o relatório IA consome minha quota?",
+              a: "Sim, cada geração de relatório consome 1 crédito da sua quota de IA (o mesmo que uma captura por voz ou texto+IA). Edições manuais no texto do relatório não consomem quota.",
+            },
+            {
+              q: "Como imprimir ou exportar um relatório em PDF?",
+              a: "Em qualquer item, clique no ícone de impressora para abrir a página de impressão limpa. No menu de relatórios (/relatorios), selecione os itens desejados e clique em 'Gerar relatório' — isso abre uma página otimizada para impressão. Use Ctrl+P (ou Cmd+P) e selecione 'Salvar como PDF' no navegador.",
             },
           ].map(({ q, a }) => (
             <div key={q} className="bg-white border border-slate-200 rounded-xl p-5">
