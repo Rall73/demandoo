@@ -39,9 +39,10 @@ model Company {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  plan     Plan      @relation(fields: [planId], references: [id])
-  users    User[]
-  demandas Demanda[]
+  plan        Plan         @relation(fields: [planId], references: [id])
+  users       User[]
+  demandas    Demanda[]
+  comentarios Comentario[]
 
   @@map("companies")
 }
@@ -63,10 +64,11 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  company  Company   @relation(fields: [companyId], references: [id])
-  accounts Account[]
-  sessions Session[]
-  demandas Demanda[]
+  company     Company      @relation(fields: [companyId], references: [id])
+  accounts    Account[]
+  sessions    Session[]
+  demandas    Demanda[]
+  comentarios Comentario[]
 
   @@index([companyId])
   @@map("users")
@@ -165,9 +167,13 @@ model Demanda {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
-  company Company       @relation(fields: [companyId], references: [id])
-  user    User          @relation(fields: [userId], references: [id])
-  acoes   AcaoDemanda[]
+  relatorioGerado   String?   @db.LongText
+  relatorioGeradoAt DateTime?
+
+  company     Company       @relation(fields: [companyId], references: [id])
+  user        User          @relation(fields: [userId], references: [id])
+  acoes       AcaoDemanda[]
+  comentarios Comentario[]
 
   @@index([companyId, userId])
   @@index([companyId, tipo])
@@ -188,6 +194,29 @@ model AcaoDemanda {
   demanda Demanda @relation(fields: [demandaId], references: [id], onDelete: Cascade)
 
   @@map("acoes_demanda")
+}
+
+// ─── Histórico de comentários / updates ──────────────────────────────────────
+
+model Comentario {
+  id        Int       @id @default(autoincrement())
+  demandaId Int
+  userId    Int
+  companyId Int
+  conteudo  String    @db.Text
+  audioUrl  String?   @db.VarChar(1000)
+  tipo      String    @default("NOTA") // NOTA | AUDIO | STATUS
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+  deletedBy Int?
+
+  demanda Demanda @relation(fields: [demandaId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([demandaId])
+  @@index([companyId])
+  @@map("comentarios")
 }
 
 model CronExecucao {

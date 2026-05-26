@@ -47,11 +47,37 @@ export async function PATCH(req: Request, { params }: Ctx) {
       }
     }
 
-    const demanda = await prisma.demanda.updateMany({
+    const STATUS_LABEL_BR: Record<string, string> = {
+      ABERTA: "Aberta", EM_ANDAMENTO: "Em andamento", CONCLUIDA: "Concluída", CANCELADA: "Cancelada",
+    }
+
+    // Busca status atual para registrar a mudança
+    const demandaAtual = body.status
+      ? await prisma.demanda.findFirst({
+          where:  { id: Number(id), companyId: session.user.companyId, deletedAt: null },
+          select: { status: true, companyId: true },
+        })
+      : null
+
+    await prisma.demanda.updateMany({
       where: { id: Number(id), companyId: session.user.companyId, deletedAt: null },
       data:  campos,
     })
-    return NextResponse.json({ ok: true, demanda })
+
+    // Auto-log de mudança de status
+    if (body.status && demandaAtual && demandaAtual.status !== body.status) {
+      await prisma.comentario.create({
+        data: {
+          demandaId: Number(id),
+          userId:    Number(session.user.id),
+          companyId: session.user.companyId,
+          conteudo:  `Status alterado de "${STATUS_LABEL_BR[demandaAtual.status] ?? demandaAtual.status}" para "${STATUS_LABEL_BR[body.status] ?? body.status}"`,
+          tipo:      "STATUS",
+        },
+      })
+    }
+
+    return NextResponse.json({ ok: true })
   } catch (err) {
     console.error("[PATCH /api/demandas/[id]]", err)
     return NextResponse.json({ error: "Erro interno" }, { status: 500 })

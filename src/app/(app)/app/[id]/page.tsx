@@ -6,6 +6,7 @@ import { ArrowLeft, Calendar, Mic, AlertTriangle, Sparkles, User, Printer } from
 import DetalheActions from "./DetalheActions"
 import DetalheContent from "./DetalheContent"
 import AcoesInterativas from "./AcoesInterativas"
+import ComentariosSection, { type ComentarioItem } from "./ComentariosSection"
 
 const STATUS_LABEL: Record<string, string> = {
   ABERTA:       "Aberta",
@@ -54,10 +55,30 @@ export default async function DetalhePage({
 
   const demanda = await prisma.demanda.findFirst({
     where:   { id: Number(id), companyId, userId, deletedAt: null },
-    include: { acoes: { where: { deletedAt: null }, orderBy: { ordem: "asc" } } },
+    include: {
+      acoes:       { where: { deletedAt: null }, orderBy: { ordem: "asc" } },
+      comentarios: {
+        where:   { deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        include: { user: { select: { name: true } } },
+      },
+    },
   })
 
   if (!demanda) notFound()
+
+  const aiQuota     = session!.user.aiQuota
+  const aiUsed      = session!.user.aiUsedTotal
+  const aiBloqueado = aiQuota !== null && aiUsed >= aiQuota
+
+  const comentariosSerializados: ComentarioItem[] = demanda.comentarios.map((c) => ({
+    id:        c.id,
+    conteudo:  c.conteudo,
+    audioUrl:  c.audioUrl ?? null,
+    tipo:      c.tipo as ComentarioItem["tipo"],
+    createdAt: c.createdAt.toISOString(),
+    user:      { name: c.user.name },
+  }))
 
   const agora   = new Date()
   const vencida =
@@ -203,6 +224,16 @@ export default async function DetalhePage({
       <AcoesInterativas
         demandaId={demanda.id}
         acoes={demanda.acoes.map((a) => ({ id: a.id, descricao: a.descricao, feita: a.feita }))}
+      />
+
+      {/* ── Histórico + Relatório IA ────────────────────────────────────────────── */}
+      <ComentariosSection
+        demandaId={demanda.id}
+        initialComentarios={comentariosSerializados}
+        relatorioGerado={demanda.relatorioGerado ?? null}
+        relatorioGeradoAt={demanda.relatorioGeradoAt?.toISOString() ?? null}
+        aiBloqueado={aiBloqueado}
+        tipo={demanda.tipo}
       />
 
       {/* ── Transições de status + exclusão (client) ───────────────────────────── */}

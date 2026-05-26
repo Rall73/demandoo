@@ -56,7 +56,10 @@ export default async function ImprimirPage({
 
   const demandas = await prisma.demanda.findMany({
     where:   { id: { in: idList }, companyId, userId, deletedAt: null },
-    include: { acoes: { where: { deletedAt: null }, orderBy: { ordem: "asc" } } },
+    include: {
+      acoes:       { where: { deletedAt: null }, orderBy: { ordem: "asc" } },
+      comentarios: { where: { deletedAt: null }, orderBy: { createdAt: "asc" }, include: { user: { select: { name: true } } } },
+    },
   })
 
   if (demandas.length === 0) notFound()
@@ -207,6 +210,16 @@ export default async function ImprimirPage({
                           </span>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Relatório IA (se gerado) */}
+                {d.relatorioGerado && (
+                  <div className="pl-10 mt-3">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Relatório</p>
+                    <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap border-l-2 border-violet-200 pl-3">
+                      {d.relatorioGerado}
                     </div>
                   </div>
                 )}
