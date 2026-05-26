@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { hojeNoBrasil } from "@/lib/date"
-import { Zap, Cloud, Clock, Server, ExternalLink, AlertTriangle } from "lucide-react"
+import { Zap, Cloud, Clock, Server, ExternalLink, AlertTriangle, BarChart2 } from "lucide-react"
 
 const CUSTO_POR_CAPTURA = 0.005   // USD estimado
 const USD_TO_BRL        = 5.7
@@ -222,6 +222,62 @@ export default async function AdminConsumoPage() {
         </div>
       </section>
 
+      {/* ── Google Analytics ── */}
+      <section>
+        <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-4">
+          <div className="w-7 h-7 bg-amber-100 rounded-lg flex items-center justify-center">
+            <BarChart2 size={15} className="text-amber-700" strokeWidth={2} />
+          </div>
+          Google Analytics
+        </h2>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          {process.env.NEXT_PUBLIC_GA_ID ? (
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-slate-700">Propriedade ativa</p>
+                <p className="text-xs text-slate-400">
+                  ID: <span className="font-mono text-slate-600">{process.env.NEXT_PUBLIC_GA_ID}</span>
+                </p>
+                <p className="text-xs text-slate-400">
+                  Rastreando visualizações de página, eventos e sessões em{" "}
+                  <span className="font-medium text-slate-600">demandoo.net</span>
+                </p>
+              </div>
+              <a
+                href={`https://analytics.google.com/analytics/web/`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-amber-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
+              >
+                <BarChart2 size={14} strokeWidth={2} />
+                Abrir Analytics →
+              </a>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" strokeWidth={2} />
+              <div>
+                <p className="text-sm font-medium text-slate-700">Google Analytics não configurado</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Adicione a variável <span className="font-mono bg-slate-100 px-1 rounded">NEXT_PUBLIC_GA_ID</span> com
+                  o ID de medição (G-XXXXXXXXXX) no painel do Hostinger.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <BarChart2 size={13} className="text-amber-500 shrink-0" strokeWidth={2} />
+          <span>
+            Métricas detalhadas de tráfego, origem, retenção e conversão disponíveis no painel.{" "}
+            <a href="https://analytics.google.com" target="_blank" rel="noopener noreferrer"
+              className="text-amber-700 font-medium underline">
+              Ver Google Analytics →
+            </a>
+          </span>
+        </div>
+      </section>
+
       {/* ── Hostinger / Infra ── */}
       <section>
         <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-4">
@@ -237,6 +293,7 @@ export default async function AdminConsumoPage() {
             { label: "Cloudinary — Media Library",    href: "https://cloudinary.com/console", desc: "Storage, bandwidth, transformações" },
             { label: "cron-job.org — Cronjobs",       href: "https://console.cron-job.org", desc: "Status e histórico dos cron jobs" },
             { label: "GitHub — Repositório",          href: "https://github.com/Rall73/demandoo", desc: "Código-fonte, commits, branches" },
+            { label: "Google Analytics — demandoo",   href: "https://analytics.google.com", desc: "Tráfego, visitantes, origem e eventos" },
           ].map(({ label, href, desc }) => (
             <a
               key={href}
