@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap, Settings, Users, Home, FileText } from "lucide-react"
+import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap, Settings, Users, Home, FileText, HelpCircle } from "lucide-react"
 import { signOut } from "next-auth/react"
 
 interface User {
@@ -108,13 +108,26 @@ export default function Sidebar({ user }: { user: User }) {
         <p className="text-xs font-medium text-white truncate">{user.name}</p>
         <p className="text-xs text-violet-400 truncate">{user.email}</p>
       </div>
-      <button
-        onClick={() => { onClick?.(); signOut({ callbackUrl: "/auth/login" }) }}
-        className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs text-violet-400 hover:text-white hover:bg-violet-800 transition-colors"
-      >
-        <LogOut size={13} strokeWidth={2} />
-        Sair
-      </button>
+      <div className="flex items-center gap-1">
+        <Link
+          href="/como-funciona"
+          target="_blank"
+          onClick={onClick}
+          className="flex items-center gap-2 flex-1 px-3 py-1.5 rounded-lg text-xs text-violet-400 hover:text-white hover:bg-violet-800 transition-colors"
+          title="Como funciona"
+        >
+          <HelpCircle size={13} strokeWidth={2} />
+          Como funciona
+        </Link>
+        <button
+          onClick={() => { onClick?.(); signOut({ callbackUrl: "/auth/login" }) }}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-violet-400 hover:text-white hover:bg-violet-800 transition-colors"
+          title="Sair"
+        >
+          <LogOut size={13} strokeWidth={2} />
+          Sair
+        </button>
+      </div>
     </div>
   )
 
