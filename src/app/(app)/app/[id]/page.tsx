@@ -8,6 +8,7 @@ import DetalheActions from "./DetalheActions"
 import DetalheContent from "./DetalheContent"
 import AcoesInterativas from "./AcoesInterativas"
 import ComentariosSection, { type ComentarioItem } from "./ComentariosSection"
+import AnexosSection, { type AnexoItem } from "./AnexosSection"
 
 const STATUS_LABEL: Record<string, string> = {
   ABERTA:       "Aberta",
@@ -63,6 +64,11 @@ export default async function DetalhePage({
         orderBy: { createdAt: "asc" },
         include: { user: { select: { name: true } } },
       },
+      anexos: {
+        where:   { deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        include: { user: { select: { name: true } } },
+      },
     },
   })
 
@@ -79,6 +85,17 @@ export default async function DetalhePage({
     tipo:      c.tipo as ComentarioItem["tipo"],
     createdAt: c.createdAt.toISOString(),
     user:      { name: c.user.name },
+  }))
+
+  const anexosSerializados: AnexoItem[] = demanda.anexos.map((a) => ({
+    id:        a.id,
+    url:       a.url,
+    nome:      a.nome,
+    tipo:      a.tipo,
+    tamanho:   a.tamanho,
+    createdAt: a.createdAt.toISOString(),
+    userId:    a.userId,
+    user:      { name: a.user.name },
   }))
 
   const hoje    = hojeNoBrasil()
@@ -225,6 +242,13 @@ export default async function DetalhePage({
       <AcoesInterativas
         demandaId={demanda.id}
         acoes={demanda.acoes.map((a) => ({ id: a.id, descricao: a.descricao, feita: a.feita }))}
+      />
+
+      {/* ── Anexos ──────────────────────────────────────────────────────────────── */}
+      <AnexosSection
+        demandaId={demanda.id}
+        sessionUserId={userId}
+        initialAnexos={anexosSerializados}
       />
 
       {/* ── Histórico + Relatório IA ────────────────────────────────────────────── */}

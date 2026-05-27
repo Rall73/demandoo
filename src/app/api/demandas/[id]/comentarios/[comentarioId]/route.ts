@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { deleteCloudinaryAsset } from "@/lib/cloudinary"
 
 type Ctx = { params: Promise<{ id: string; comentarioId: string }> }
 
@@ -22,7 +23,7 @@ export async function DELETE(_: Request, { params }: Ctx) {
         userId,       // só o próprio autor pode excluir
         deletedAt:  null,
       },
-      select: { id: true },
+      select: { id: true, audioUrl: true },
     })
     if (!comentario) return NextResponse.json({ error: "Não encontrado" }, { status: 404 })
 
@@ -30,6 +31,11 @@ export async function DELETE(_: Request, { params }: Ctx) {
       where: { id: Number(comentarioId) },
       data:  { deletedAt: new Date(), deletedBy: userId },
     })
+
+    // Remove áudio do Cloudinary (best-effort)
+    if (comentario.audioUrl) {
+      deleteCloudinaryAsset(comentario.audioUrl, "video").catch(console.error)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err) {

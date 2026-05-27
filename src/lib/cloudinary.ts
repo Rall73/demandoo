@@ -8,6 +8,13 @@ cloudinary.config({
 
 export default cloudinary
 
+/** Mapeia MIME type para o resource_type do Cloudinary. */
+export function cloudinaryResourceType(mimeType: string): "image" | "video" | "raw" {
+  if (mimeType.startsWith("image/")) return "image"
+  if (mimeType.startsWith("video/") || mimeType.startsWith("audio/")) return "video"
+  return "raw"
+}
+
 /** Extrai o publicId de uma URL Cloudinary para deletar o asset. */
 export function publicIdFromUrl(url: string): string {
   // https://res.cloudinary.com/{cloud}/video/upload/v123/pasta/arquivo.webm

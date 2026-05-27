@@ -43,6 +43,7 @@ model Company {
   users       User[]
   demandas    Demanda[]
   comentarios Comentario[]
+  anexos      Anexo[]
 
   @@map("companies")
 }
@@ -69,6 +70,7 @@ model User {
   sessions    Session[]
   demandas    Demanda[]
   comentarios Comentario[]
+  anexos      Anexo[]
 
   @@index([companyId])
   @@map("users")
@@ -174,6 +176,7 @@ model Demanda {
   user        User          @relation(fields: [userId], references: [id])
   acoes       AcaoDemanda[]
   comentarios Comentario[]
+  anexos      Anexo[]
 
   @@index([companyId, userId])
   @@index([companyId, tipo])
@@ -217,6 +220,30 @@ model Comentario {
   @@index([demandaId])
   @@index([companyId])
   @@map("comentarios")
+}
+
+// ─── Anexos ───────────────────────────────────────────────────────────────────
+
+model Anexo {
+  id        Int       @id @default(autoincrement())
+  demandaId Int
+  userId    Int
+  companyId Int
+  url       String    @db.VarChar(1000)
+  nome      String    @db.VarChar(255)   // nome original do arquivo
+  tipo      String    @db.VarChar(100)   // MIME type: image/jpeg, application/pdf, etc.
+  tamanho   Int       @default(0)        // bytes
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+  deletedBy Int?
+
+  demanda Demanda @relation(fields: [demandaId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([demandaId])
+  @@index([companyId])
+  @@map("anexos")
 }
 
 model CronExecucao {

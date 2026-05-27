@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { deleteCloudinaryAsset } from "@/lib/cloudinary"
+import { deleteCloudinaryAsset, cloudinaryResourceType } from "@/lib/cloudinary"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -93,7 +93,11 @@ export async function DELETE(_: Request, { params }: Ctx) {
 
     const demanda = await prisma.demanda.findFirst({
       where:  { id: Number(id), companyId: session.user.companyId, deletedAt: null },
-      select: { audioUrl: true },
+      select: {
+        audioUrl:    true,
+        comentarios: { where: { deletedAt: null, audioUrl: { not: null } }, select: { audioUrl: true } },
+        anexos:      { where: { deletedAt: null }, select: { url: true, tipo: true } },
+      },
     })
     if (!demanda) return NextResponse.json({ error: "Não encontrado" }, { status: 404 })
 
@@ -103,10 +107,15 @@ export async function DELETE(_: Request, { params }: Ctx) {
       data:  { deletedAt: new Date(), deletedBy: userId },
     })
 
-    // Remove áudio do Cloudinary (best-effort)
-    if (demanda.audioUrl) {
-      deleteCloudinaryAsset(demanda.audioUrl, "video").catch(console.error)
-    }
+    // Cloudinary — limpa todos os assets associados (best-effort, fire-and-forget)
+    const cleanups: Promise<unknown>[] = []
+    if (demanda.audioUrl)
+      cleanups.push(deleteCloudinaryAsset(demanda.audioUrl, "video"))
+    for (const c of demanda.comentarios)
+      if (c.audioUrl) cleanups.push(deleteCloudinaryAsset(c.audioUrl, "video"))
+    for (const a of demanda.anexos)
+      cleanups.push(deleteCloudinaryAsset(a.url, cloudinaryResourceType(a.tipo)))
+    Promise.allSettled(cleanups).catch(console.error)
 
     return NextResponse.json({ ok: true })
   } catch (err) {

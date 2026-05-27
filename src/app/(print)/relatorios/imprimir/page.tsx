@@ -60,6 +60,7 @@ export default async function ImprimirPage({
     include: {
       acoes:       { where: { deletedAt: null }, orderBy: { ordem: "asc" } },
       comentarios: { where: { deletedAt: null }, orderBy: { createdAt: "asc" }, include: { user: { select: { name: true } } } },
+      anexos:      { where: { deletedAt: null }, orderBy: { createdAt: "asc" } },
     },
   })
 
@@ -212,6 +213,33 @@ export default async function ImprimirPage({
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Anexos */}
+                {d.anexos.length > 0 && (
+                  <div className="pl-10 mt-3">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      Anexos ({d.anexos.length})
+                    </p>
+                    {/* Imagens: exibe thumbnail */}
+                    {d.anexos.filter(a => a.tipo.startsWith("image/")).length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {d.anexos.filter(a => a.tipo.startsWith("image/")).map(a => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={a.id}
+                            src={a.url}
+                            alt={a.nome}
+                            className="w-24 h-24 object-cover rounded border border-slate-200 print:w-20 print:h-20"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {/* Outros arquivos: lista nome */}
+                    {d.anexos.filter(a => !a.tipo.startsWith("image/")).map(a => (
+                      <p key={a.id} className="text-xs text-slate-500">📎 {a.nome}</p>
+                    ))}
                   </div>
                 )}
 
