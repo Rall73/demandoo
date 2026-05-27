@@ -7,8 +7,7 @@ import { ArrowLeft, Calendar, Mic, AlertTriangle, Sparkles, User, Printer } from
 import DetalheActions from "./DetalheActions"
 import DetalheContent from "./DetalheContent"
 import AcoesInterativas from "./AcoesInterativas"
-import ComentariosSection, { type ComentarioItem } from "./ComentariosSection"
-import AnexosSection, { type AnexoItem } from "./AnexosSection"
+import ComentariosSection, { type ComentarioItem, type AnexoItem } from "./ComentariosSection"
 
 const STATUS_LABEL: Record<string, string> = {
   ABERTA:       "Aberta",
@@ -244,17 +243,12 @@ export default async function DetalhePage({
         acoes={demanda.acoes.map((a) => ({ id: a.id, descricao: a.descricao, feita: a.feita }))}
       />
 
-      {/* ── Anexos ──────────────────────────────────────────────────────────────── */}
-      <AnexosSection
-        demandaId={demanda.id}
-        sessionUserId={userId}
-        initialAnexos={anexosSerializados}
-      />
-
       {/* ── Histórico + Relatório IA ────────────────────────────────────────────── */}
       <ComentariosSection
         demandaId={demanda.id}
+        sessionUserId={userId}
         initialComentarios={comentariosSerializados}
+        initialAnexos={anexosSerializados}
         relatorioGerado={demanda.relatorioGerado ?? null}
         relatorioGeradoAt={demanda.relatorioGeradoAt?.toISOString() ?? null}
         aiBloqueado={aiBloqueado}

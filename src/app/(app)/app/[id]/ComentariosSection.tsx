@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation"
 import {
   Mic, Square, Send, Loader2, Trash2, Sparkles,
   MessageSquare, AlertTriangle, FileText, Check, Pencil, X,
+  Paperclip, Camera, Download, Image as ImageIcon, File, Table,
 } from "lucide-react"
 
-// ── Tipos ─────────────────────────────────────────────────────────────────────
+// ── Tipos exportados ──────────────────────────────────────────────────────────
 export interface ComentarioItem {
   id:        number
   conteudo:  string
@@ -17,16 +18,56 @@ export interface ComentarioItem {
   user:      { name: string }
 }
 
-interface Props {
-  demandaId:         number
-  initialComentarios: ComentarioItem[]
-  relatorioGerado:   string | null
-  relatorioGeradoAt: string | null
-  aiBloqueado:       boolean
-  tipo:              string
+export interface AnexoItem {
+  id:        number
+  url:       string
+  nome:      string
+  tipo:      string
+  tamanho:   number
+  createdAt: string
+  userId:    number
+  user:      { name: string }
 }
 
-// ── Ícone e cor por tipo de comentário ────────────────────────────────────────
+type TimelineEntry =
+  | { kind: "comentario"; createdAt: string; data: ComentarioItem }
+  | { kind: "anexo";      createdAt: string; data: AnexoItem }
+
+interface Props {
+  demandaId:          number
+  sessionUserId:      number
+  initialComentarios: ComentarioItem[]
+  initialAnexos:      AnexoItem[]
+  relatorioGerado:    string | null
+  relatorioGeradoAt:  string | null
+  aiBloqueado:        boolean
+  tipo:               string
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatBytes(bytes: number): string {
+  if (bytes < 1024)        return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function AnexoFileIcon({ tipo, className }: { tipo: string; className?: string }) {
+  if (tipo.startsWith("image/"))                              return <ImageIcon size={13} strokeWidth={2} className={className} />
+  if (tipo === "application/pdf")                            return <FileText  size={13} strokeWidth={2} className={className} />
+  if (tipo.includes("spreadsheet") || tipo.includes("excel")) return <Table    size={13} strokeWidth={2} className={className} />
+  return <File size={13} strokeWidth={2} className={className} />
+}
+
+const TIPOS_ACEITOS = [
+  "image/jpeg", "image/png", "image/gif", "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain", "text/csv",
+].join(",")
+
 function TipoIcon({ tipo }: { tipo: string }) {
   if (tipo === "STATUS")
     return <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
@@ -38,6 +79,16 @@ function TipoIcon({ tipo }: { tipo: string }) {
     </div>
   return <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
     <MessageSquare size={13} className="text-blue-500" strokeWidth={2} />
+  </div>
+}
+
+function AnexoIcon({ tipo }: { tipo: string }) {
+  if (tipo.startsWith("image/"))
+    return <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+      <Camera size={13} className="text-emerald-500" strokeWidth={2} />
+    </div>
+  return <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+    <Paperclip size={13} className="text-slate-500" strokeWidth={2} />
   </div>
 }
 
@@ -53,12 +104,11 @@ function dataRelativa(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
 }
 
-// ── Markdown simples (negrito, itálico, listas, títulos) ──────────────────────
+// Markdown simples
 function MarkdownSimples({ texto }: { texto: string }) {
-  const linhas = texto.split("\n")
   return (
     <div className="space-y-1.5">
-      {linhas.map((linha, i) => {
+      {texto.split("\n").map((linha, i) => {
         if (!linha.trim()) return <div key={i} className="h-2" />
         if (linha.startsWith("## "))
           return <h3 key={i} className="text-sm font-bold text-slate-800 mt-3 first:mt-0">{linha.replace("## ", "")}</h3>
@@ -68,28 +118,24 @@ function MarkdownSimples({ texto }: { texto: string }) {
           return (
             <div key={i} className="flex gap-2 text-sm text-slate-700">
               <span className="shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-400" />
-              <span dangerouslySetInnerHTML={{ __html: inlineFormato(linha.replace(/^[-*] /, "")) }} />
+              <span dangerouslySetInnerHTML={{ __html: inlineFmt(linha.replace(/^[-*] /, "")) }} />
             </div>
           )
-        return (
-          <p key={i} className="text-sm text-slate-700 leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: inlineFormato(linha) }} />
-        )
+        return <p key={i} className="text-sm text-slate-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: inlineFmt(linha) }} />
       })}
     </div>
   )
 }
-
-function inlineFormato(t: string): string {
-  return t
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+function inlineFmt(t: string) {
+  return t.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>")
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function ComentariosSection({
   demandaId,
+  sessionUserId,
   initialComentarios,
+  initialAnexos,
   relatorioGerado,
   relatorioGeradoAt,
   aiBloqueado,
@@ -98,32 +144,46 @@ export default function ComentariosSection({
   const router = useRouter()
 
   // Comentários
-  const [comentarios,    setComentarios]    = useState<ComentarioItem[]>(initialComentarios)
-  const [novoTexto,      setNovoTexto]      = useState("")
-  const [salvando,       setSalvando]       = useState(false)
-  const [deletandoId,    setDeletandoId]    = useState<number | null>(null)
+  const [comentarios,      setComentarios]      = useState<ComentarioItem[]>(initialComentarios)
+  const [novoTexto,        setNovoTexto]        = useState("")
+  const [salvando,         setSalvando]         = useState(false)
+  const [deletandoId,      setDeletandoId]      = useState<number | null>(null)
+
+  // Anexos
+  const [anexos,           setAnexos]           = useState<AnexoItem[]>(initialAnexos)
+  const [uploadingAnexo,   setUploadingAnexo]   = useState(false)
+  const [erroAnexo,        setErroAnexo]        = useState<string | null>(null)
+  const [deletandoAnexoId, setDeletandoAnexoId] = useState<number | null>(null)
+  const fileInputRef   = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   // Gravação de áudio
-  const [gravando,       setGravando]       = useState(false)
+  const [gravando,         setGravando]         = useState(false)
   const [processandoAudio, setProcessandoAudio] = useState(false)
-  const [tempo,          setTempo]          = useState(0)
+  const [tempo,            setTempo]            = useState(0)
   const mediaRef  = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef  = useRef<NodeJS.Timeout | null>(null)
   const mimeRef   = useRef<string>("audio/webm")
 
   // Relatório IA
-  const [relatorio,      setRelatorio]      = useState<string | null>(relatorioGerado)
-  const [relatorioAt,    setRelatorioAt]    = useState<string | null>(relatorioGeradoAt)
-  const [gerandoRel,     setGerandoRel]     = useState(false)
-  const [editandoRel,    setEditandoRel]    = useState(false)
-  const [tmpRelatorio,   setTmpRelatorio]   = useState("")
-  const [salvandoRel,    setSalvandoRel]    = useState(false)
-  const [relatorioErro,  setRelatorioErro]  = useState<string | null>(null)
+  const [relatorio,     setRelatorio]     = useState<string | null>(relatorioGerado)
+  const [relatorioAt,   setRelatorioAt]   = useState<string | null>(relatorioGeradoAt)
+  const [gerandoRel,    setGerandoRel]    = useState(false)
+  const [editandoRel,   setEditandoRel]   = useState(false)
+  const [tmpRelatorio,  setTmpRelatorio]  = useState("")
+  const [salvandoRel,   setSalvandoRel]   = useState(false)
+  const [relatorioErro, setRelatorioErro] = useState<string | null>(null)
 
   useEffect(() => {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [])
+
+  // ── Timeline mesclada ─────────────────────────────────────────────────────
+  const timeline: TimelineEntry[] = [
+    ...comentarios.map((c) => ({ kind: "comentario" as const, createdAt: c.createdAt, data: c })),
+    ...anexos.map((a)      => ({ kind: "anexo"      as const, createdAt: a.createdAt, data: a })),
+  ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
   // ── Adicionar nota de texto ───────────────────────────────────────────────
   async function enviarTexto() {
@@ -131,18 +191,55 @@ export default function ComentariosSection({
     if (!texto) return
     setSalvando(true)
     setNovoTexto("")
-
     const res  = await fetch(`/api/demandas/${demandaId}/comentarios`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ conteudo: texto, tipo: "NOTA" }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body:   JSON.stringify({ conteudo: texto, tipo: "NOTA" }),
     })
     const data = await res.json()
-    if (data.comentario) {
-      setComentarios((prev) => [...prev, data.comentario])
-    }
+    if (data.comentario) setComentarios((prev) => [...prev, data.comentario])
     setSalvando(false)
     router.refresh()
+  }
+
+  // ── Excluir comentário ────────────────────────────────────────────────────
+  async function excluirComentario(id: number) {
+    setDeletandoId(id)
+    await fetch(`/api/demandas/${demandaId}/comentarios/${id}`, { method: "DELETE" })
+    setComentarios((prev) => prev.filter((c) => c.id !== id))
+    setDeletandoId(null)
+    router.refresh()
+  }
+
+  // ── Upload de anexo (arquivo ou foto) ─────────────────────────────────────
+  async function handleUpload(file: File) {
+    setErroAnexo(null)
+    setUploadingAnexo(true)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res  = await fetch(`/api/demandas/${demandaId}/anexos`, { method: "POST", body: form })
+      const data = await res.json()
+      if (!res.ok) { setErroAnexo(data.error ?? "Erro no upload."); return }
+      setAnexos((prev) => [...prev, data.anexo])
+    } catch {
+      setErroAnexo("Erro de rede ao enviar o arquivo.")
+    } finally {
+      setUploadingAnexo(false)
+    }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (file) handleUpload(file)
+  }
+
+  // ── Excluir anexo ─────────────────────────────────────────────────────────
+  async function excluirAnexo(id: number) {
+    setDeletandoAnexoId(id)
+    await fetch(`/api/demandas/${demandaId}/anexos/${id}`, { method: "DELETE" })
+    setAnexos((prev) => prev.filter((a) => a.id !== id))
+    setDeletandoAnexoId(null)
   }
 
   // ── Gravação de áudio ─────────────────────────────────────────────────────
@@ -150,13 +247,12 @@ export default function ComentariosSection({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mime   = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4"
-      mimeRef.current = mime
-      const rec    = new MediaRecorder(stream, { mimeType: mime })
+      mimeRef.current   = mime
+      const rec         = new MediaRecorder(stream, { mimeType: mime })
       mediaRef.current  = rec
       chunksRef.current = []
-
       rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      rec.onstop          = finalizarGravacao
+      rec.onstop = finalizarGravacao
       rec.start()
       setGravando(true)
       setTempo(0)
@@ -177,37 +273,22 @@ export default function ComentariosSection({
   const finalizarGravacao = useCallback(async () => {
     const blob = new Blob(chunksRef.current, { type: mimeRef.current })
     if (blob.size < 1000) { setProcessandoAudio(false); return }
-
     const formData = new FormData()
     formData.append("audio", blob, "audio.webm")
-
     const uploadRes = await fetch("/api/upload/audio", { method: "POST", body: formData })
     const { url }   = await uploadRes.json()
     if (!url) { setProcessandoAudio(false); return }
-
     const res  = await fetch(`/api/demandas/${demandaId}/comentarios`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ audioUrl: url, tipo: "AUDIO" }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body:   JSON.stringify({ audioUrl: url, tipo: "AUDIO" }),
     })
     const data = await res.json()
-    if (data.comentario) {
-      setComentarios((prev) => [...prev, data.comentario])
-    }
+    if (data.comentario) setComentarios((prev) => [...prev, data.comentario])
     setProcessandoAudio(false)
     router.refresh()
   }, [demandaId, router])
 
-  // ── Excluir comentário ────────────────────────────────────────────────────
-  async function excluir(id: number) {
-    setDeletandoId(id)
-    await fetch(`/api/demandas/${demandaId}/comentarios/${id}`, { method: "DELETE" })
-    setComentarios((prev) => prev.filter((c) => c.id !== id))
-    setDeletandoId(null)
-    router.refresh()
-  }
-
-  // ── Gerar relatório IA ────────────────────────────────────────────────────
+  // ── Relatório IA ──────────────────────────────────────────────────────────
   async function gerarRelatorio() {
     setGerandoRel(true)
     setRelatorioErro(null)
@@ -224,13 +305,11 @@ export default function ComentariosSection({
     setGerandoRel(false)
   }
 
-  // ── Salvar edição do relatório ────────────────────────────────────────────
   async function salvarRelatorio() {
     setSalvandoRel(true)
     await fetch(`/api/demandas/${demandaId}/relatorio`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ relatorioGerado: tmpRelatorio }),
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body:   JSON.stringify({ relatorioGerado: tmpRelatorio }),
     })
     setRelatorio(tmpRelatorio)
     setEditandoRel(false)
@@ -238,139 +317,221 @@ export default function ComentariosSection({
   }
 
   const tempoStr = `${Math.floor(tempo / 60).toString().padStart(2, "0")}:${(tempo % 60).toString().padStart(2, "0")}`
+  const ocupado  = gravando || processandoAudio || uploadingAnexo
 
   return (
     <>
-      {/* ── Histórico de comentários ─────────────────────────────────────────── */}
+      {/* ── Histórico unificado ──────────────────────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">
         <p className="text-sm font-semibold text-slate-700 mb-4">Histórico</p>
 
         {/* Timeline */}
-        {comentarios.length === 0 ? (
+        {timeline.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-4">
             Nenhuma atualização ainda. Adicione uma nota abaixo.
           </p>
         ) : (
           <div className="space-y-3 mb-4">
-            {comentarios.map((c) => (
-              <div key={c.id} className="flex gap-3 group">
-                <TipoIcon tipo={c.tipo} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-medium text-slate-600">{c.user.name}</span>
-                    <span className="text-xs text-slate-400">{dataRelativa(c.createdAt)}</span>
-                    {c.tipo === "STATUS" && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                        status
-                      </span>
+            {timeline.map((entry) => {
+              if (entry.kind === "comentario") {
+                const c = entry.data
+                return (
+                  <div key={`c-${c.id}`} className="flex gap-3 group">
+                    <TipoIcon tipo={c.tipo} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-xs font-medium text-slate-600">{c.user.name}</span>
+                        <span className="text-xs text-slate-400">{dataRelativa(c.createdAt)}</span>
+                        {c.tipo === "STATUS" && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">status</span>
+                        )}
+                        {c.tipo === "AUDIO" && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-500">áudio</span>
+                        )}
+                      </div>
+                      <p className={`text-sm leading-snug ${c.tipo === "STATUS" ? "text-slate-500 italic" : "text-slate-700"}`}>
+                        {c.conteudo}
+                      </p>
+                      {c.audioUrl && (
+                        <audio controls src={c.audioUrl} className="mt-1.5 h-8 w-full max-w-xs" />
+                      )}
+                    </div>
+                    {c.tipo !== "STATUS" && (
+                      <button
+                        onClick={() => excluirComentario(c.id)}
+                        disabled={deletandoId === c.id}
+                        className="shrink-0 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all disabled:opacity-40 mt-0.5"
+                        title="Excluir"
+                      >
+                        {deletandoId === c.id
+                          ? <Loader2 size={13} className="animate-spin" />
+                          : <Trash2 size={13} strokeWidth={2} />}
+                      </button>
                     )}
-                    {c.tipo === "AUDIO" && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-500">
-                        áudio
+                  </div>
+                )
+              }
+
+              // Anexo
+              const a = entry.data
+              const isImagem = a.tipo.startsWith("image/")
+              return (
+                <div key={`a-${a.id}`} className="flex gap-3 group">
+                  <AnexoIcon tipo={a.tipo} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-slate-600">{a.user.name}</span>
+                      <span className="text-xs text-slate-400">{dataRelativa(a.createdAt)}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                        isImagem ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-500"
+                      }`}>
+                        {isImagem ? "foto" : "arquivo"}
                       </span>
+                    </div>
+
+                    {isImagem ? (
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={a.url}
+                          alt={a.nome}
+                          className="w-40 h-28 object-cover rounded-lg border border-slate-200 hover:opacity-90 transition-opacity"
+                        />
+                        <p className="text-xs text-slate-400 mt-1">{a.nome} · {formatBytes(a.tamanho)}</p>
+                      </a>
+                    ) : (
+                      <a
+                        href={a.url}
+                        download={a.nome}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors"
+                      >
+                        <AnexoFileIcon tipo={a.tipo} className="text-slate-500 shrink-0" />
+                        <span className="text-xs text-slate-700 font-medium truncate max-w-[180px]">{a.nome}</span>
+                        <span className="text-xs text-slate-400 shrink-0">{formatBytes(a.tamanho)}</span>
+                        <Download size={12} strokeWidth={2} className="text-slate-400 shrink-0" />
+                      </a>
                     )}
                   </div>
 
-                  <p className={`text-sm leading-snug ${
-                    c.tipo === "STATUS" ? "text-slate-500 italic" : "text-slate-700"
-                  }`}>
-                    {c.conteudo}
-                  </p>
-
-                  {c.audioUrl && (
-                    <audio
-                      controls
-                      src={c.audioUrl}
-                      className="mt-1.5 h-8 w-full max-w-xs"
-                    />
+                  {a.userId === sessionUserId && (
+                    <button
+                      onClick={() => excluirAnexo(a.id)}
+                      disabled={deletandoAnexoId === a.id}
+                      className="shrink-0 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all disabled:opacity-40 mt-0.5"
+                      title="Remover"
+                    >
+                      {deletandoAnexoId === a.id
+                        ? <Loader2 size={13} className="animate-spin" />
+                        : <Trash2 size={13} strokeWidth={2} />}
+                    </button>
                   )}
                 </div>
-
-                {/* Excluir (só NOTA e AUDIO, não STATUS) */}
-                {c.tipo !== "STATUS" && (
-                  <button
-                    onClick={() => excluir(c.id)}
-                    disabled={deletandoId === c.id}
-                    className="shrink-0 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all disabled:opacity-40 mt-0.5"
-                    title="Excluir"
-                  >
-                    {deletandoId === c.id
-                      ? <Loader2 size={13} className="animate-spin" />
-                      : <Trash2 size={13} strokeWidth={2} />}
-                  </button>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
         {/* ── Input de nova nota ────────────────────────────────────────────── */}
         <div className="border-t border-slate-100 pt-4">
+          {erroAnexo && (
+            <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{erroAnexo}</p>
+          )}
+
+          {/* Textarea + botão enviar */}
           <div className="flex gap-2 items-end">
             <textarea
               value={novoTexto}
               onChange={(e) => setNovoTexto(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) enviarTexto()
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) enviarTexto() }}
               placeholder="Adicionar observação… (Ctrl+Enter para enviar)"
               rows={2}
-              disabled={gravando || processandoAudio}
+              disabled={ocupado}
               className="flex-1 resize-none text-sm text-gray-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-50"
             />
-
-            <div className="flex flex-col gap-1.5">
-              {/* Enviar texto */}
-              <button
-                onClick={enviarTexto}
-                disabled={!novoTexto.trim() || salvando || gravando || processandoAudio}
-                className="p-2 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Enviar nota (Ctrl+Enter)"
-              >
-                {salvando
-                  ? <Loader2 size={15} className="animate-spin" />
-                  : <Send size={15} strokeWidth={2} />}
-              </button>
-
-              {/* Gravar áudio */}
-              {!gravando && !processandoAudio && (
-                <button
-                  onClick={iniciarGravacao}
-                  disabled={salvando}
-                  className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-violet-600 hover:border-violet-300 transition-colors disabled:opacity-40"
-                  title="Gravar nota de voz"
-                >
-                  <Mic size={15} strokeWidth={2} />
-                </button>
-              )}
-            </div>
+            <button
+              onClick={enviarTexto}
+              disabled={!novoTexto.trim() || salvando || ocupado}
+              className="p-2 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Enviar nota (Ctrl+Enter)"
+            >
+              {salvando
+                ? <Loader2 size={15} className="animate-spin" />
+                : <Send size={15} strokeWidth={2} />}
+            </button>
           </div>
 
-          {/* Estado de gravação */}
-          {(gravando || processandoAudio) && (
-            <div className="mt-2 flex items-center gap-3">
-              {gravando ? (
-                <>
-                  <div className="flex items-center gap-1.5 text-red-500 text-xs font-medium">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    Gravando {tempoStr}
-                  </div>
-                  <button
-                    onClick={pararGravacao}
-                    className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                  >
-                    <Square size={11} strokeWidth={2.5} fill="currentColor" />
-                    Parar
-                  </button>
-                </>
-              ) : (
-                <div className="flex items-center gap-1.5 text-slate-500 text-xs">
-                  <Loader2 size={13} className="animate-spin" />
-                  Transcrevendo áudio…
-                </div>
-              )}
-            </div>
-          )}
+          {/* 3 botões de mídia */}
+          <div className="flex items-center gap-1 mt-2">
+            {/* Arquivo */}
+            <button
+              onClick={() => { setErroAnexo(null); fileInputRef.current?.click() }}
+              disabled={ocupado}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-violet-600 hover:bg-violet-50 transition-colors disabled:opacity-40"
+              title="Anexar arquivo"
+            >
+              {uploadingAnexo
+                ? <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+                : <Paperclip size={14} strokeWidth={2} />}
+              Arquivo
+            </button>
+
+            {/* Foto */}
+            <button
+              onClick={() => { setErroAnexo(null); cameraInputRef.current?.click() }}
+              disabled={ocupado}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-40"
+              title="Tirar foto"
+            >
+              <Camera size={14} strokeWidth={2} />
+              Foto
+            </button>
+
+            {/* Áudio */}
+            {!gravando && !processandoAudio ? (
+              <button
+                onClick={iniciarGravacao}
+                disabled={uploadingAnexo || salvando}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-violet-600 hover:bg-violet-50 transition-colors disabled:opacity-40"
+                title="Gravar nota de voz"
+              >
+                <Mic size={14} strokeWidth={2} />
+                Áudio
+              </button>
+            ) : gravando ? (
+              <button
+                onClick={pararGravacao}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+              >
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                {tempoStr} — Parar
+                <Square size={11} strokeWidth={2.5} fill="currentColor" />
+              </button>
+            ) : (
+              <span className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-400">
+                <Loader2 size={13} className="animate-spin" />
+                Transcrevendo…
+              </span>
+            )}
+          </div>
+
+          {/* Inputs ocultos */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={TIPOS_ACEITOS}
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </div>
       </div>
 
@@ -382,20 +543,14 @@ export default function ComentariosSection({
             <p className="text-sm font-semibold text-slate-700">Relatório</p>
           </div>
           {relatorioAt && !editandoRel && (
-            <span className="text-xs text-slate-400">
-              gerado {dataRelativa(relatorioAt)}
-            </span>
+            <span className="text-xs text-slate-400">gerado {dataRelativa(relatorioAt)}</span>
           )}
         </div>
 
-        {/* Erro */}
         {relatorioErro && (
-          <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3">
-            {relatorioErro}
-          </p>
+          <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3">{relatorioErro}</p>
         )}
 
-        {/* Relatório gerado — visualização */}
         {relatorio && !editandoRel && (
           <div className="mt-3">
             <div className="bg-slate-50 rounded-xl p-4 mb-3 border border-slate-100">
@@ -406,8 +561,7 @@ export default function ComentariosSection({
                 onClick={() => { setTmpRelatorio(relatorio); setEditandoRel(true) }}
                 className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-violet-600 transition-colors"
               >
-                <Pencil size={12} strokeWidth={2} />
-                Editar
+                <Pencil size={12} strokeWidth={2} /> Editar
               </button>
               <a
                 href={`/relatorios/imprimir?ids=${demandaId}&tipo=${tipo}`}
@@ -415,25 +569,21 @@ export default function ComentariosSection({
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-violet-600 transition-colors"
               >
-                <FileText size={12} strokeWidth={2} />
-                Imprimir
+                <FileText size={12} strokeWidth={2} /> Imprimir
               </a>
               <button
                 onClick={gerarRelatorio}
                 disabled={gerandoRel || aiBloqueado}
                 className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 hover:text-violet-600 transition-colors disabled:opacity-40"
-                title="Gerar novo relatório (substitui o atual)"
+                title="Regenerar (substitui o atual)"
               >
-                {gerandoRel
-                  ? <Loader2 size={12} className="animate-spin" />
-                  : <Sparkles size={12} strokeWidth={2} />}
+                {gerandoRel ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} strokeWidth={2} />}
                 Regenerar
               </button>
             </div>
           </div>
         )}
 
-        {/* Editor de relatório */}
         {editandoRel && (
           <div className="mt-3">
             <textarea
@@ -448,9 +598,7 @@ export default function ComentariosSection({
                 disabled={salvandoRel}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50"
               >
-                {salvandoRel
-                  ? <Loader2 size={12} className="animate-spin" />
-                  : <Check size={12} strokeWidth={2.5} />}
+                {salvandoRel ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} strokeWidth={2.5} />}
                 Salvar
               </button>
               <button
@@ -464,7 +612,6 @@ export default function ComentariosSection({
           </div>
         )}
 
-        {/* Sem relatório ainda */}
         {!relatorio && !editandoRel && (
           <div className="mt-3">
             <p className="text-sm text-slate-400 mb-3">
@@ -474,9 +621,7 @@ export default function ComentariosSection({
               onClick={gerarRelatorio}
               disabled={gerandoRel || aiBloqueado}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                aiBloqueado
-                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                  : "bg-violet-600 text-white hover:bg-violet-700"
+                aiBloqueado ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-violet-600 text-white hover:bg-violet-700"
               }`}
             >
               {gerandoRel
