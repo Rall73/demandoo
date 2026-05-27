@@ -2,6 +2,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import { hojeNoBrasil } from "@/lib/date"
 import { ArrowLeft } from "lucide-react"
 import PrintButton from "./PrintButton"
 
@@ -129,10 +130,10 @@ export default async function ImprimirPage({
         <div className="space-y-5">
           {lista.map((d, i) => {
             const prazoStr  = prazoFormatado(d.prazo)
-            const agora     = new Date()
+            const hoje      = hojeNoBrasil()
             const vencida   =
               !!d.prazo &&
-              d.prazo < agora &&
+              d.prazo < hoje &&
               d.status !== "CONCLUIDA" &&
               d.status !== "CANCELADA"
 

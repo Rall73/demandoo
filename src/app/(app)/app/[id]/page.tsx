@@ -2,6 +2,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import { hojeNoBrasil } from "@/lib/date"
 import { ArrowLeft, Calendar, Mic, AlertTriangle, Sparkles, User, Printer } from "lucide-react"
 import DetalheActions from "./DetalheActions"
 import DetalheContent from "./DetalheContent"
@@ -80,10 +81,10 @@ export default async function DetalhePage({
     user:      { name: c.user.name },
   }))
 
-  const agora   = new Date()
+  const hoje    = hojeNoBrasil()
   const vencida =
     !!demanda.prazo &&
-    demanda.prazo < agora &&
+    demanda.prazo < hoje &&
     demanda.status !== "CONCLUIDA" &&
     demanda.status !== "CANCELADA"
 

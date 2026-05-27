@@ -90,10 +90,12 @@ export default function RelatorioClient({
   const [ordenacao,    setOrdenacao]    = useState<Ordenacao>("PADRAO")
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set())
 
-  const hoje = new Date()
-  const isVencida = (d: DemandaRelatorio) =>
-    !!d.prazo && new Date(d.prazo) < hoje &&
-    d.status !== "CONCLUIDA" && d.status !== "CANCELADA"
+  const hojeInicio = new Date(); hojeInicio.setHours(0, 0, 0, 0)
+  const isVencida = (d: DemandaRelatorio) => {
+    if (!d.prazo || d.status === "CONCLUIDA" || d.status === "CANCELADA") return false
+    const prazoDia = new Date(d.prazo); prazoDia.setHours(0, 0, 0, 0)
+    return prazoDia < hojeInicio
+  }
 
   const filtradas = useMemo(() => ordenar(
     demandas.filter((d) => {

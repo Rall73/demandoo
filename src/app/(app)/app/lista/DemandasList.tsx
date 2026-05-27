@@ -98,13 +98,13 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
   const [ordenacao,    setOrdenacao]    = useState<Ordenacao>("PADRAO")
   const [toggling,     setToggling]     = useState<number | null>(null)
 
-  // Prazo vencido: compara data em UTC com now() (só p/ display — ok no client)
-  const hoje = new Date()
-  const isVencida = (d: DemandaItem) =>
-    !!d.prazo &&
-    new Date(d.prazo) < hoje &&
-    d.status !== "CONCLUIDA" &&
-    d.status !== "CANCELADA"
+  // Prazo vencido: compara apenas a data (sem hora) para não vencer no próprio dia
+  const hojeInicio = new Date(); hojeInicio.setHours(0, 0, 0, 0)
+  const isVencida = (d: DemandaItem) => {
+    if (!d.prazo || d.status === "CONCLUIDA" || d.status === "CANCELADA") return false
+    const prazoDia = new Date(d.prazo); prazoDia.setHours(0, 0, 0, 0)
+    return prazoDia < hojeInicio
+  }
 
   // Filtragem + ordenação
   const filtradas = ordenar(
