@@ -344,11 +344,16 @@ npx tsc --noEmit && npx next build
 
 ### 🔲 6.1 Planos e Billing (🔴 Alta — bloqueador de receita)
 
+**Gateway escolhido: Asaas** (plataforma BR, recorrência nativa, Pix + boleto + cartão, sem câmbio)
+
 | Item | Prioridade |
 |---|---|
-| Integração com gateway de pagamento (Stripe ou Pagar.me) | 🔴 |
-| Webhook de pagamento → atualiza `planId` e `planExpiresAt` | 🔴 |
+| Integração Asaas — checkout de assinatura | 🔴 |
+| Webhook Asaas → atualiza `planId` e `planExpiresAt` | 🔴 |
 | Controle de expiração de plano | 🔴 |
+| Reverter `free.aiQuota` de 500 → 20 antes de ativar billing | 🔴 |
+
+> **Nota:** free plan está com `aiQuota = 500` temporariamente (beta, aumentado em 2026-05-28). Reverter via phpMyAdmin antes do billing entrar no ar.
 
 ### 🔲 6.2 LGPD (🔴 Alta — obrigação legal)
 
@@ -397,6 +402,8 @@ npx tsc --noEmit && npx next build
 | 2026-05-25 | v0.8 | Admin panel completo, cron log, ícone ⚡, classificação IA corrigida |
 | 2026-05-25 | v0.9 | Dashboard com 3 cards, lista separada `/app/lista`, ordenação, relatórios + impressão |
 | 2026-05-25 | v1.0 | Histórico de comentários (texto + voz + auto-log status), relatório IA por item editável |
+| 2026-05-27 | v1.1 | Google Analytics (G-RZNM5FMJ22), link ajuda no sidebar, landing + /como-funciona atualizados |
+| 2026-05-28 | — | Free aiQuota: 20 → 500 (temp, beta). Decisão: manter PWA, não publicar em lojas por ora |
 
 ---
 

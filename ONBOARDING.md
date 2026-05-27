@@ -298,6 +298,8 @@ demandoo/
 | `src/middleware.ts` fixo | Next.js só carrega esse nome — `proxy.ts` é ignorado silenciosamente |
 | `SUPER_ADMIN_EMAIL` em env var | Ricardo é único super-admin — coluna no banco seria over-engineering |
 | `(print)` route group | Permite layout sem sidebar para páginas de impressão, mantendo auth guard |
+| **PWA em vez de app nativo** (2026-05-28) | App Store exige reescrita nativa + 30% sobre receitas iOS; Play Store TWA é opção futura; PWA já instalável sem custo de loja |
+| **Asaas como gateway de billing** (2026-05-28) | BR nativo, recorrência nativa, Pix + boleto + cartão, sem câmbio; Stripe fica como alternativa se escalar internacionalmente |
 
 ---
 
