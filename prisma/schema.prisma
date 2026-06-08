@@ -44,6 +44,8 @@ model Company {
   demandas    Demanda[]
   comentarios Comentario[]
   anexos      Anexo[]
+  listas      Lista[]
+  itensList   ItemLista[]
 
   @@map("companies")
 }
@@ -71,6 +73,7 @@ model User {
   demandas    Demanda[]
   comentarios Comentario[]
   anexos      Anexo[]
+  listas      Lista[]
 
   @@index([companyId])
   @@map("users")
@@ -245,6 +248,63 @@ model Anexo {
   @@index([companyId])
   @@map("anexos")
 }
+
+// ─── Listas ───────────────────────────────────────────────────────────────────
+
+enum ListaTipo {
+  COMPRAS
+  VENCIMENTOS
+  LEMBRETES
+  GERAL
+}
+
+model Lista {
+  id        Int       @id @default(autoincrement())
+  companyId Int
+  userId    Int
+  titulo    String    @db.VarChar(300)
+  descricao String?   @db.VarChar(1000)
+  tipo      ListaTipo @default(GERAL)
+  cor       String?   @db.VarChar(20)
+  deletedAt DateTime?
+  deletedBy Int?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company Company     @relation(fields: [companyId], references: [id])
+  user    User        @relation(fields: [userId], references: [id])
+  itens   ItemLista[]
+
+  @@index([companyId, userId])
+  @@map("listas")
+}
+
+model ItemLista {
+  id                Int       @id @default(autoincrement())
+  listaId           Int
+  companyId         Int
+  texto             String    @db.VarChar(1000)
+  concluido         Boolean   @default(false)
+  concluidoAt       DateTime?
+  dataVencimento    DateTime?
+  recorrente        Boolean   @default(false)
+  lembrarAntesDias  Int?
+  lembreteEnviadoAt DateTime?
+  url               String?   @db.VarChar(1000)
+  ordem             Int       @default(0)
+  deletedAt         DateTime?
+  deletedBy         Int?
+  createdAt         DateTime  @default(now())
+
+  lista   Lista   @relation(fields: [listaId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([listaId])
+  @@index([companyId])
+  @@map("itens_lista")
+}
+
+// ─── Cron ─────────────────────────────────────────────────────────────────────
 
 model CronExecucao {
   id          Int      @id @default(autoincrement())

@@ -158,6 +158,41 @@ export async function sendLembreteEmail(
   })
 }
 
+/** Envia lembrete de item de lista (vencimento ou data marcada). */
+export async function sendLembreteListaEmail(
+  email:    string,
+  userName: string,
+  listaId:  number,
+  listaTitulo: string,
+  itemTexto:   string,
+  dataFormatada: string,
+  diasRestantes: number,
+): Promise<void> {
+  const url = `${APP_URL}/app/listas/${listaId}`
+  const urgente = diasRestantes === 0
+
+  await makeTransporter().sendMail({
+    from:    FROM,
+    to:      email,
+    subject: urgente
+      ? `Lembrete hoje: ${itemTexto}`
+      : `Lembrete em ${diasRestantes} dia${diasRestantes !== 1 ? "s" : ""}: ${itemTexto}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#7c3aed">Lembrete — ${listaTitulo}</h2>
+        <p>Olá, ${userName}!</p>
+        <p>${urgente ? "Este item vence <strong>hoje</strong>:" : `Este item vence em <strong>${diasRestantes} dia${diasRestantes !== 1 ? "s" : ""}</strong> (${dataFormatada}):`}</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0">
+          <p style="margin:0;font-weight:600;color:#1e293b">${itemTexto}</p>
+        </div>
+        <a href="${url}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
+          Ver lista
+        </a>
+      </div>
+    `,
+  })
+}
+
 /** Envia e-mail de reset de senha. */
 export async function sendPasswordResetEmail(email: string, token: string): Promise<void> {
   const url = `${APP_URL}/auth/nova-senha?token=${token}`
