@@ -3,11 +3,11 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
-  PlayCircle, CheckCircle2, RotateCcw, XCircle,
+  PlayCircle, CheckCircle2, RotateCcw, XCircle, PauseCircle,
   Trash2, Loader2, AlertTriangle,
 } from "lucide-react"
 
-type Status = "ABERTA" | "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA"
+type Status = "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA" | "CONCLUIDA" | "CANCELADA"
 
 interface Props {
   demandaId: number
@@ -23,6 +23,11 @@ const TRANSICOES: Record<Status, { label: string; novoStatus: Status; icon: Reac
   ],
   EM_ANDAMENTO: [
     { label: "Concluir",  novoStatus: "CONCLUIDA",    icon: CheckCircle2, cls: "bg-emerald-600 text-white hover:bg-emerald-700" },
+    { label: "Em espera", novoStatus: "EM_ESPERA",    icon: PauseCircle,  cls: "bg-white text-amber-600 border border-amber-200 hover:bg-amber-50" },
+    { label: "Cancelar",  novoStatus: "CANCELADA",    icon: XCircle,      cls: "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" },
+  ],
+  EM_ESPERA: [
+    { label: "Retomar",   novoStatus: "EM_ANDAMENTO", icon: PlayCircle,   cls: "bg-violet-600 text-white hover:bg-violet-700" },
     { label: "Cancelar",  novoStatus: "CANCELADA",    icon: XCircle,      cls: "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" },
   ],
   CONCLUIDA: [
@@ -37,6 +42,7 @@ const TRANSICOES: Record<Status, { label: string; novoStatus: Status; icon: Reac
 const TRANSICOES_TAREFA: Record<string, { label: string; novoStatus: Status; icon: React.ElementType; cls: string }[]> = {
   ABERTA:       [{ label: "Marcar como feita", novoStatus: "CONCLUIDA", icon: CheckCircle2, cls: "bg-emerald-600 text-white hover:bg-emerald-700" }],
   EM_ANDAMENTO: [{ label: "Marcar como feita", novoStatus: "CONCLUIDA", icon: CheckCircle2, cls: "bg-emerald-600 text-white hover:bg-emerald-700" }],
+  EM_ESPERA:    [{ label: "Retomar",           novoStatus: "EM_ANDAMENTO", icon: PlayCircle, cls: "bg-violet-600 text-white hover:bg-violet-700" }],
   CONCLUIDA:    [{ label: "Reabrir",           novoStatus: "ABERTA",    icon: RotateCcw,    cls: "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" }],
   CANCELADA:    [{ label: "Reabrir",           novoStatus: "ABERTA",    icon: RotateCcw,    cls: "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50" }],
 }

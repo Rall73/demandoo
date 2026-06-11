@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap, Settings, Users, Home, FileText, HelpCircle, ListChecks } from "lucide-react"
+import { Inbox, CheckSquare, Lightbulb, Calendar, Plus, Menu, X, LogOut, Zap, Settings, Users, Home, FileText, HelpCircle, ListChecks, Target } from "lucide-react"
 import { signOut } from "next-auth/react"
 
 interface User {
@@ -17,6 +17,7 @@ interface User {
 
 const NAV = [
   { href: "/app",                    label: "Início",        icon: Home,        tipo: null },
+  { href: "/app/foco",               label: "Foco",          icon: Target,      tipo: null },
   { href: "/app/lista?tipo=DEMANDA", label: "Demandas",      icon: Inbox,       tipo: "DEMANDA" },
   { href: "/app/lista?tipo=TAREFA",  label: "Tarefas",       icon: CheckSquare, tipo: "TAREFA" },
   { href: "/app/lista?tipo=IDEIA",   label: "Ideias",        icon: Lightbulb,   tipo: "IDEIA" },

@@ -34,7 +34,7 @@ export async function GET(req: Request) {
   const fimAmanha = new Date(amanha)
   fimAmanha.setDate(fimAmanha.getDate() + 1) // início de depois = fim de amanhã
 
-  const statusAbertos = ["ABERTA", "EM_ANDAMENTO"] as ("ABERTA" | "EM_ANDAMENTO")[]
+  const statusAbertos = ["ABERTA", "EM_ANDAMENTO", "EM_ESPERA"] as ("ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA")[]
 
   // ── Busca demandas D-0 (hoje) e D-1 (amanhã) ────────────────────────────────
   const [demandasHoje, demandasAmanha] = await Promise.all([

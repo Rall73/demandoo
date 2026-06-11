@@ -11,7 +11,7 @@ const TIPO_LABEL: Record<string, string> = {
   IDEIA:   "Ideia",
 }
 const STATUS_LABEL: Record<string, string> = {
-  ABERTA: "Aberta", EM_ANDAMENTO: "Em andamento", CONCLUIDA: "Concluída", CANCELADA: "Cancelada",
+  ABERTA: "Aberta", EM_ANDAMENTO: "Em andamento", EM_ESPERA: "Em espera", CONCLUIDA: "Concluída", CANCELADA: "Cancelada",
 }
 const PRIO_LABEL: Record<string, string> = {
   BAIXA: "Baixa", MEDIA: "Média", ALTA: "Alta", CRITICA: "Crítica",

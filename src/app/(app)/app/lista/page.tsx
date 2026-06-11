@@ -73,10 +73,10 @@ export default async function AppPage({
 
     // KPI 1
     tipoFiltro === "DEMANDA"
-      ? prisma.demanda.count({ where: { ...baseT, status: { in: ["ABERTA", "EM_ANDAMENTO"] } } })
+      ? prisma.demanda.count({ where: { ...baseT, status: { in: ["ABERTA", "EM_ANDAMENTO", "EM_ESPERA"] } } })
       : tipoFiltro === "TAREFA"
-      ? prisma.demanda.count({ where: { ...baseT, status: "ABERTA" } })
-      : prisma.demanda.count({ where: { ...baseT, status: { in: ["ABERTA", "EM_ANDAMENTO"] } } }),
+      ? prisma.demanda.count({ where: { ...baseT, status: { notIn: ["CONCLUIDA", "CANCELADA"] } } })
+      : prisma.demanda.count({ where: { ...baseT, status: { in: ["ABERTA", "EM_ANDAMENTO", "EM_ESPERA"] } } }),
 
     // KPI 2
     tipoFiltro === "IDEIA"

@@ -4,13 +4,13 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
-  Search, X, CheckCircle2, Clock, PlayCircle, Ban,
+  Search, X, CheckCircle2, Clock, PlayCircle, PauseCircle, Ban,
   AlertTriangle, ChevronRight, Inbox, CheckSquare, Lightbulb, Loader2, Sparkles, ArrowUpDown,
 } from "lucide-react"
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 type Tipo   = "DEMANDA" | "TAREFA" | "IDEIA"
-type Status = "ABERTA" | "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA"
+type Status = "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA" | "CONCLUIDA" | "CANCELADA"
 type Prio   = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
 
 export interface DemandaItem {
@@ -31,6 +31,7 @@ export interface DemandaItem {
 const STATUS_LABEL: Record<Status, string> = {
   ABERTA:       "Aberta",
   EM_ANDAMENTO: "Em andamento",
+  EM_ESPERA:    "Em espera",
   CONCLUIDA:    "Concluída",
   CANCELADA:    "Cancelada",
 }
@@ -38,6 +39,7 @@ const STATUS_LABEL: Record<Status, string> = {
 const STATUS_ICON = {
   ABERTA:       Clock,
   EM_ANDAMENTO: PlayCircle,
+  EM_ESPERA:    PauseCircle,
   CONCLUIDA:    CheckCircle2,
   CANCELADA:    Ban,
 } as const
@@ -45,6 +47,7 @@ const STATUS_ICON = {
 const STATUS_COLOR: Record<Status, string> = {
   ABERTA:       "text-blue-600 bg-blue-50 border-blue-100",
   EM_ANDAMENTO: "text-amber-600 bg-amber-50 border-amber-100",
+  EM_ESPERA:    "text-orange-600 bg-orange-50 border-orange-100",
   CONCLUIDA:    "text-emerald-600 bg-emerald-50 border-emerald-100",
   CANCELADA:    "text-slate-400 bg-slate-50 border-slate-100",
 }
@@ -175,6 +178,7 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
           <option value="TODOS">Todos os status</option>
           <option value="ABERTA">Aberta</option>
           <option value="EM_ANDAMENTO">Em andamento</option>
+          <option value="EM_ESPERA">Em espera</option>
           <option value="CONCLUIDA">Concluída</option>
           <option value="CANCELADA">Cancelada</option>
         </select>

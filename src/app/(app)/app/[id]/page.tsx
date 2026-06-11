@@ -12,12 +12,14 @@ import ComentariosSection, { type ComentarioItem, type AnexoItem } from "./Comen
 const STATUS_LABEL: Record<string, string> = {
   ABERTA:       "Aberta",
   EM_ANDAMENTO: "Em andamento",
+  EM_ESPERA:    "Em espera",
   CONCLUIDA:    "Concluída",
   CANCELADA:    "Cancelada",
 }
 const STATUS_COLOR: Record<string, string> = {
   ABERTA:       "bg-blue-100 text-blue-700",
   EM_ANDAMENTO: "bg-amber-100 text-amber-700",
+  EM_ESPERA:    "bg-orange-100 text-orange-700",
   CONCLUIDA:    "bg-emerald-100 text-emerald-700",
   CANCELADA:    "bg-slate-100 text-slate-500",
 }

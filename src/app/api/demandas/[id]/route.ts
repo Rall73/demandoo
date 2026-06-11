@@ -37,27 +37,46 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (body.prazo !== undefined) campos.prazo = body.prazo ? new Date(body.prazo + "T03:00:00Z") : null
     if (body.delegadoNome !== undefined) campos.delegadoNome = body.delegadoNome || null
 
-    // concluidoAt: set when transitioning to CONCLUIDA, clear when reopening
-    if (body.status) {
-      campos.status = body.status
-      if (body.status === "CONCLUIDA") {
-        campos.concluidoAt = new Date()
-      } else if (body.status === "ABERTA" || body.status === "EM_ANDAMENTO" || body.status === "CANCELADA") {
-        campos.concluidoAt = null
-      }
-    }
-
     const STATUS_LABEL_BR: Record<string, string> = {
-      ABERTA: "Aberta", EM_ANDAMENTO: "Em andamento", CONCLUIDA: "Concluída", CANCELADA: "Cancelada",
+      ABERTA: "Aberta", EM_ANDAMENTO: "Em andamento", EM_ESPERA: "Em espera",
+      CONCLUIDA: "Concluída", CANCELADA: "Cancelada",
     }
 
     // Busca status atual para registrar a mudança
     const demandaAtual = body.status
       ? await prisma.demanda.findFirst({
           where:  { id: Number(id), companyId: session.user.companyId, deletedAt: null },
-          select: { status: true, companyId: true },
+          select: { status: true, companyId: true, focoIniciadoEm: true },
         })
       : null
+
+    if (body.status) {
+      campos.status = body.status
+
+      if (body.status === "CONCLUIDA") {
+        campos.concluidoAt = new Date()
+        campos.focoIniciadoEm = null
+      } else if (body.status === "ABERTA" || body.status === "CANCELADA") {
+        campos.concluidoAt    = null
+        campos.focoIniciadoEm = null
+      } else if (body.status === "EM_ANDAMENTO") {
+        // só seta focoIniciadoEm se não estava em andamento antes
+        if (demandaAtual?.status !== "EM_ANDAMENTO") {
+          campos.focoIniciadoEm = new Date()
+        }
+        campos.concluidoAt    = null
+        campos.focoMotivoEspera = null
+      } else if (body.status === "EM_ESPERA") {
+        campos.focoIniciadoEm = null
+        if (body.focoMotivoEspera !== undefined) {
+          campos.focoMotivoEspera = body.focoMotivoEspera || null
+        }
+      }
+    }
+
+    if (body.focoMotivoEspera !== undefined && !body.status) {
+      campos.focoMotivoEspera = body.focoMotivoEspera || null
+    }
 
     await prisma.demanda.updateMany({
       where: { id: Number(id), companyId: session.user.companyId, deletedAt: null },
@@ -66,12 +85,24 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
     // Auto-log de mudança de status
     if (body.status && demandaAtual && demandaAtual.status !== body.status) {
+      let logMsg = `Status alterado de "${STATUS_LABEL_BR[demandaAtual.status] ?? demandaAtual.status}" para "${STATUS_LABEL_BR[body.status] ?? body.status}"`
+
+      // registra duração da sessão de foco ao sair de EM_ANDAMENTO
+      if (demandaAtual.status === "EM_ANDAMENTO" && demandaAtual.focoIniciadoEm) {
+        const mins = Math.round((Date.now() - demandaAtual.focoIniciadoEm.getTime()) / 60000)
+        if (mins > 0) logMsg += ` (sessão de foco: ${mins < 60 ? `${mins}min` : `${Math.floor(mins / 60)}h${mins % 60 > 0 ? ` ${mins % 60}min` : ""}` })`
+      }
+
+      if (body.status === "EM_ESPERA" && body.focoMotivoEspera) {
+        logMsg += ` — motivo: ${body.focoMotivoEspera}`
+      }
+
       await prisma.comentario.create({
         data: {
           demandaId: Number(id),
           userId:    Number(session.user.id),
           companyId: session.user.companyId,
-          conteudo:  `Status alterado de "${STATUS_LABEL_BR[demandaAtual.status] ?? demandaAtual.status}" para "${STATUS_LABEL_BR[body.status] ?? body.status}"`,
+          conteudo:  logMsg,
           tipo:      "STATUS",
         },
       })

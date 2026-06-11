@@ -137,6 +137,7 @@ enum DemandaTipo {
 enum DemandaStatus {
   ABERTA
   EM_ANDAMENTO
+  EM_ESPERA
   CONCLUIDA
   CANCELADA
 }
@@ -164,6 +165,8 @@ model Demanda {
   delegadoNome      String?           @db.VarChar(200)
   audioUrl          String?           @db.VarChar(1000)
   aiProcessado      Boolean           @default(false)
+  focoIniciadoEm       DateTime?
+  focoMotivoEspera     String?   @db.VarChar(255)
   concluidoAt          DateTime?
   lembreteD1EnviadoAt  DateTime?
   lembreteD0EnviadoAt  DateTime?

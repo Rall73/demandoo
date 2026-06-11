@@ -24,7 +24,7 @@ export async function GET(req: Request) {
         userId,
         deletedAt: null,
         ...(tipo   ? { tipo:   tipo   as "DEMANDA" | "TAREFA" | "IDEIA" } : {}),
-        ...(status ? { status: status as "ABERTA" | "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA" } : {}),
+        ...(status ? { status: status as "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA" | "CONCLUIDA" | "CANCELADA" } : {}),
       },
       include: { acoes: { orderBy: { ordem: "asc" } } },
       orderBy: [{ prioridade: "asc" }, { createdAt: "desc" }],

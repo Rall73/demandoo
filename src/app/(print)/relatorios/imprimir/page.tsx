@@ -7,12 +7,13 @@ import { ArrowLeft } from "lucide-react"
 import PrintButton from "./PrintButton"
 
 type Tipo   = "DEMANDA" | "TAREFA" | "IDEIA"
-type Status = "ABERTA" | "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA"
+type Status = "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA" | "CONCLUIDA" | "CANCELADA"
 type Prio   = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
 
 const STATUS_LABEL: Record<Status, string> = {
   ABERTA:       "Aberta",
   EM_ANDAMENTO: "Em andamento",
+  EM_ESPERA:    "Em espera",
   CONCLUIDA:    "Concluída",
   CANCELADA:    "Cancelada",
 }

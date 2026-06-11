@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation"
 import {
   Search, X, ArrowUpDown, FileText,
   Inbox, CheckSquare, Lightbulb, CheckCircle2,
-  Clock, PlayCircle, Ban, AlertTriangle, Printer, Sparkles,
+  Clock, PlayCircle, PauseCircle, Ban, AlertTriangle, Printer, Sparkles,
 } from "lucide-react"
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type Tipo   = "DEMANDA" | "TAREFA" | "IDEIA"
-type Status = "ABERTA" | "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA"
+type Status = "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA" | "CONCLUIDA" | "CANCELADA"
 type Prio   = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
 
 export interface DemandaRelatorio {
@@ -29,14 +29,15 @@ export interface DemandaRelatorio {
 
 // ── Constantes visuais ────────────────────────────────────────────────────────
 const STATUS_LABEL: Record<Status, string> = {
-  ABERTA: "Aberta", EM_ANDAMENTO: "Em andamento", CONCLUIDA: "Concluída", CANCELADA: "Cancelada",
+  ABERTA: "Aberta", EM_ANDAMENTO: "Em andamento", EM_ESPERA: "Em espera", CONCLUIDA: "Concluída", CANCELADA: "Cancelada",
 }
 const STATUS_ICON = {
-  ABERTA: Clock, EM_ANDAMENTO: PlayCircle, CONCLUIDA: CheckCircle2, CANCELADA: Ban,
+  ABERTA: Clock, EM_ANDAMENTO: PlayCircle, EM_ESPERA: PauseCircle, CONCLUIDA: CheckCircle2, CANCELADA: Ban,
 } as const
 const STATUS_COLOR: Record<Status, string> = {
   ABERTA:       "text-blue-600 bg-blue-50 border-blue-100",
   EM_ANDAMENTO: "text-amber-600 bg-amber-50 border-amber-100",
+  EM_ESPERA:    "text-orange-600 bg-orange-50 border-orange-100",
   CONCLUIDA:    "text-emerald-600 bg-emerald-50 border-emerald-100",
   CANCELADA:    "text-slate-400 bg-slate-50 border-slate-100",
 }
@@ -205,6 +206,7 @@ export default function RelatorioClient({
           <option value="TODOS">Todos os status</option>
           <option value="ABERTA">Aberta</option>
           <option value="EM_ANDAMENTO">Em andamento</option>
+          <option value="EM_ESPERA">Em espera</option>
           <option value="CONCLUIDA">Concluída</option>
           <option value="CANCELADA">Cancelada</option>
         </select>

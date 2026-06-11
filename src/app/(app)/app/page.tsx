@@ -24,7 +24,7 @@ export default async function DashboardPage() {
 
   const hoje  = hojeNoBrasil()
   const base  = { companyId, userId, deletedAt: null } as const
-  const ativo = { in: ["ABERTA" as const, "EM_ANDAMENTO" as const] }
+  const ativo = { in: ["ABERTA" as const, "EM_ANDAMENTO" as const, "EM_ESPERA" as const] }
 
   // ── Queries em paralelo ───────────────────────────────────────────────────
   const [
