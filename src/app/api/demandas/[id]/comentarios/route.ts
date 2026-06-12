@@ -56,7 +56,8 @@ export async function POST(req: Request, { params }: Ctx) {
 
     let conteudo = (body.conteudo ?? "").trim()
     const audioUrl = body.audioUrl ?? null
-    const tipo     = body.tipo === "AUDIO" ? "AUDIO" : "NOTA"
+    const TIPOS_VALIDOS = ["NOTA", "AUDIO", "TELEFONEMA", "EMAIL", "REUNIAO"]
+    const tipo = TIPOS_VALIDOS.includes(body.tipo ?? "") ? (body.tipo ?? "NOTA") : "NOTA"
 
     // ── Se vier áudio, transcreve com Whisper ─────────────────────────────────
     if (audioUrl && tipo === "AUDIO") {

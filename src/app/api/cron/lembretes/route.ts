@@ -42,6 +42,7 @@ export async function GET(req: Request) {
       where: {
         prazo:              { gte: hoje, lt: fimHoje },
         status:             { in: statusAbertos },
+        tipo:               { not: "DIARIO" },
         deletedAt:          null,
         lembreteD0EnviadoAt: null,
       },
@@ -53,6 +54,7 @@ export async function GET(req: Request) {
       where: {
         prazo:              { gte: amanha, lt: fimAmanha },
         status:             { in: statusAbertos },
+        tipo:               { not: "DIARIO" },
         deletedAt:          null,
         lembreteD1EnviadoAt: null,
       },

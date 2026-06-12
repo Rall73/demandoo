@@ -87,10 +87,23 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (body.status && demandaAtual && demandaAtual.status !== body.status) {
       let logMsg = `Status alterado de "${STATUS_LABEL_BR[demandaAtual.status] ?? demandaAtual.status}" para "${STATUS_LABEL_BR[body.status] ?? body.status}"`
 
-      // registra duração da sessão de foco ao sair de EM_ANDAMENTO
+      // registra sessão de foco estruturada ao sair de EM_ANDAMENTO
       if (demandaAtual.status === "EM_ANDAMENTO" && demandaAtual.focoIniciadoEm) {
-        const mins = Math.round((Date.now() - demandaAtual.focoIniciadoEm.getTime()) / 60000)
-        if (mins > 0) logMsg += ` (sessão de foco: ${mins < 60 ? `${mins}min` : `${Math.floor(mins / 60)}h${mins % 60 > 0 ? ` ${mins % 60}min` : ""}` })`
+        const encerradoEm = new Date()
+        const mins = Math.round((encerradoEm.getTime() - demandaAtual.focoIniciadoEm.getTime()) / 60000)
+        if (mins > 0) {
+          logMsg += ` (sessão de foco: ${mins < 60 ? `${mins}min` : `${Math.floor(mins / 60)}h${mins % 60 > 0 ? ` ${mins % 60}min` : ""}` })`
+          await prisma.sessaoFoco.create({
+            data: {
+              companyId:   session.user.companyId,
+              userId:      Number(session.user.id),
+              demandaId:   Number(id),
+              iniciadoEm:  demandaAtual.focoIniciadoEm,
+              encerradoEm,
+              duracaoMin:  mins,
+            },
+          })
+        }
       }
 
       if (body.status === "EM_ESPERA" && body.focoMotivoEspera) {

@@ -16,11 +16,13 @@ const DOT_COLOR: Record<DemandaTipo, string> = {
   DEMANDA: "bg-violet-500",
   TAREFA:  "bg-emerald-500",
   IDEIA:   "bg-amber-500",
+  DIARIO:  "bg-slate-400",
 }
 const PILL_CLASS: Record<DemandaTipo, string> = {
   DEMANDA: "bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100",
   TAREFA:  "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
   IDEIA:   "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100",
+  DIARIO:  "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100",
 }
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
 

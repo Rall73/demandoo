@@ -23,7 +23,7 @@ export default async function CalendarioPage({
   const fim    = new Date(Date.UTC(anoNow, mesNow, 1)     + 3 * 3600000)
 
   const demandas = await prisma.demanda.findMany({
-    where: { companyId, userId, deletedAt: null, prazo: { gte: inicio, lt: fim } },
+    where: { companyId, userId, deletedAt: null, tipo: { not: "DIARIO" }, prazo: { gte: inicio, lt: fim } },
     select: { id: true, titulo: true, tipo: true, status: true, prioridade: true, prazo: true },
     orderBy: { prazo: "asc" },
   })

@@ -4,18 +4,21 @@ export const TIPO_LABEL: Record<DemandaTipo, string> = {
   DEMANDA: "Demandas",
   TAREFA:  "Tarefas",
   IDEIA:   "Ideias",
+  DIARIO:  "Diário",
 }
 
 export const TIPO_LABEL_SINGULAR: Record<DemandaTipo, string> = {
   DEMANDA: "Demanda",
   TAREFA:  "Tarefa",
   IDEIA:   "Ideia",
+  DIARIO:  "Diário",
 }
 
 export const TIPO_CHIP: Record<DemandaTipo, string> = {
   DEMANDA: "bg-violet-100 text-violet-700 border border-violet-200",
   TAREFA:  "bg-emerald-100 text-emerald-700 border border-emerald-200",
   IDEIA:   "bg-amber-100 text-amber-700 border border-amber-200",
+  DIARIO:  "bg-slate-100 text-slate-600 border border-slate-200",
 }
 
 export const TIPO_ACCENT: Record<DemandaTipo, {
@@ -53,5 +56,14 @@ export const TIPO_ACCENT: Record<DemandaTipo, {
     border:   "border-amber-200",
     ring:     "ring-amber-500",
     iconText: "text-amber-500",
+  },
+  DIARIO: {
+    text:     "text-slate-600",
+    bg:       "bg-slate-500",
+    bgHover:  "hover:bg-slate-600",
+    bgLight:  "bg-slate-50",
+    border:   "border-slate-200",
+    ring:     "ring-slate-400",
+    iconText: "text-slate-400",
   },
 }

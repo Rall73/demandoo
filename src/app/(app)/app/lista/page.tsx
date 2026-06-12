@@ -112,7 +112,7 @@ export default async function AppPage({
     id:              d.id,
     titulo:          d.titulo,
     descricao:       d.descricao,
-    tipo:            d.tipo,
+    tipo:            d.tipo as Tipo,
     status:          d.status,
     prioridade:      d.prioridade,
     prazo:           d.prazo?.toISOString() ?? null,

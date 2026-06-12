@@ -23,7 +23,9 @@ export async function GET(req: Request) {
         companyId,
         userId,
         deletedAt: null,
-        ...(tipo   ? { tipo:   tipo   as "DEMANDA" | "TAREFA" | "IDEIA" } : {}),
+        ...(tipo
+          ? { tipo: tipo as "DEMANDA" | "TAREFA" | "IDEIA" }
+          : { tipo: { not: "DIARIO" as const } }),
         ...(status ? { status: status as "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA" | "CONCLUIDA" | "CANCELADA" } : {}),
       },
       include: { acoes: { orderBy: { ordem: "asc" } } },

@@ -14,6 +14,7 @@ export default async function FocoPage() {
       companyId,
       userId,
       deletedAt: null,
+      tipo:   { not: "DIARIO" },
       status: { notIn: ["CONCLUIDA", "CANCELADA"] },
     },
     select: {
@@ -35,7 +36,7 @@ export default async function FocoPage() {
   const serialized: DemandaFoco[] = demandas.map((d) => ({
     id:               d.id,
     titulo:           d.titulo,
-    tipo:             d.tipo,
+    tipo:             d.tipo as DemandaFoco["tipo"],
     status:           d.status as DemandaFoco["status"],
     prioridade:       d.prioridade,
     prazo:            d.prazo?.toISOString() ?? null,

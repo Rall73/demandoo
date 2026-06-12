@@ -132,6 +132,7 @@ enum DemandaTipo {
   DEMANDA
   TAREFA
   IDEIA
+  DIARIO
 }
 
 enum DemandaStatus {
@@ -183,6 +184,7 @@ model Demanda {
   acoes       AcaoDemanda[]
   comentarios Comentario[]
   anexos      Anexo[]
+  sessoesFoco SessaoFoco[]
 
   @@index([companyId, userId])
   @@index([companyId, tipo])
@@ -196,6 +198,7 @@ model AcaoDemanda {
   demandaId Int
   descricao String    @db.VarChar(1000)
   feita     Boolean   @default(false)
+  prazo     DateTime?
   ordem     Int       @default(0)
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -305,6 +308,28 @@ model ItemLista {
   @@index([listaId])
   @@index([companyId])
   @@map("itens_lista")
+}
+
+// ─── Cron ─────────────────────────────────────────────────────────────────────
+
+// ─── Sessões de foco ──────────────────────────────────────────────────────────
+
+model SessaoFoco {
+  id          Int      @id @default(autoincrement())
+  companyId   Int
+  userId      Int
+  demandaId   Int
+  iniciadoEm  DateTime
+  encerradoEm DateTime
+  duracaoMin  Int
+  createdAt   DateTime @default(now())
+
+  demanda Demanda @relation(fields: [demandaId], references: [id], onDelete: Cascade)
+
+  @@index([demandaId])
+  @@index([companyId, userId])
+  @@index([iniciadoEm])
+  @@map("sessoes_foco")
 }
 
 // ─── Cron ─────────────────────────────────────────────────────────────────────

@@ -160,7 +160,7 @@ export default async function DetalhePage({
       {/* ── Card principal: tipo (dropdown) + título + descrição + editar detalhes ── */}
       <DetalheContent
         demandaId={demanda.id}
-        tipo={demanda.tipo}
+        tipo={demanda.tipo as "DEMANDA" | "TAREFA" | "IDEIA"}
         titulo={demanda.titulo}
         descricao={demanda.descricao}
         prioridade={demanda.prioridade}
