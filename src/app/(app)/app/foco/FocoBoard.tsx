@@ -1,20 +1,21 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   Inbox, CheckSquare, Lightbulb,
   Clock, PlayCircle, PauseCircle,
-  AlertCircle, ChevronRight,
+  AlertCircle, ChevronRight, ArrowUpDown,
   Loader2, X, Check,
 } from "lucide-react"
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-type Tipo      = "DEMANDA" | "TAREFA" | "IDEIA"
-type Status    = "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA"
+type Tipo       = "DEMANDA" | "TAREFA" | "IDEIA"
+type Status     = "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA"
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
+type Ordenacao  = "PADRAO" | "CRIACAO" | "VENCIMENTO" | "IMPORTANCIA"
 
 export interface DemandaFoco {
   id:               number
@@ -26,9 +27,10 @@ export interface DemandaFoco {
   delegadoNome:     string | null
   focoIniciadoEm:   string | null
   focoMotivoEspera: string | null
+  createdAt:        string
 }
 
-// ── Constantes visuais ────────────────────────────────────────────────────────
+// ── Constantes ────────────────────────────────────────────────────────────────
 
 const TIPO_ICON: Record<Tipo, typeof Inbox> = {
   DEMANDA: Inbox,
@@ -39,6 +41,14 @@ const TIPO_COLOR: Record<Tipo, string> = {
   DEMANDA: "bg-violet-100 text-violet-700",
   TAREFA:  "bg-emerald-100 text-emerald-700",
   IDEIA:   "bg-amber-100 text-amber-700",
+}
+const TIPO_ATIVO: Record<Tipo, string> = {
+  DEMANDA: "bg-violet-600 text-white",
+  TAREFA:  "bg-emerald-600 text-white",
+  IDEIA:   "bg-amber-500 text-white",
+}
+const PRIO_ORDEM: Record<Prioridade, number> = {
+  CRITICA: 0, ALTA: 1, MEDIA: 2, BAIXA: 3,
 }
 const PRIO_COLOR: Record<Prioridade, string> = {
   BAIXA:   "text-slate-400",
@@ -54,11 +64,11 @@ const PRIO_LABEL: Record<Prioridade, string> = {
 
 function formatPrazo(iso: string | null): string | null {
   if (!iso) return null
-  const d     = new Date(iso)
-  const hoje  = new Date()
+  const d    = new Date(iso)
+  const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
-  const diff  = Math.floor((d.getTime() - hoje.getTime()) / 86400000)
-  if (diff < 0)  return `venceu há ${Math.abs(diff)}d`
+  const diff = Math.floor((d.getTime() - hoje.getTime()) / 86400000)
+  if (diff < 0)   return `venceu há ${Math.abs(diff)}d`
   if (diff === 0) return "vence hoje"
   if (diff === 1) return "vence amanhã"
   return `vence ${d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}`
@@ -81,13 +91,35 @@ function formatDuracao(isoInicio: string): string {
   return m > 0 ? `${h}h ${m}min` : `${h}h`
 }
 
-// ── Componente de card individual ─────────────────────────────────────────────
+function aplicarOrdenacao(lista: DemandaFoco[], ord: Ordenacao): DemandaFoco[] {
+  return [...lista].sort((a, b) => {
+    if (ord === "IMPORTANCIA") {
+      const diff = PRIO_ORDEM[a.prioridade] - PRIO_ORDEM[b.prioridade]
+      return diff !== 0 ? diff : a.titulo.localeCompare(b.titulo)
+    }
+    if (ord === "VENCIMENTO") {
+      if (!a.prazo && !b.prazo) return 0
+      if (!a.prazo) return 1
+      if (!b.prazo) return -1
+      return new Date(a.prazo).getTime() - new Date(b.prazo).getTime()
+    }
+    if (ord === "CRIACAO") {
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    }
+    // PADRAO: prioridade → prazo → criação
+    const pd = PRIO_ORDEM[a.prioridade] - PRIO_ORDEM[b.prioridade]
+    if (pd !== 0) return pd
+    if (a.prazo && b.prazo) return new Date(a.prazo).getTime() - new Date(b.prazo).getTime()
+    if (a.prazo) return -1
+    if (b.prazo) return 1
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+}
+
+// ── Card ─────────────────────────────────────────────────────────────────────
 
 function DemandaCard({
-  demanda,
-  isDragging,
-  onDragStart,
-  col,
+  demanda, isDragging, onDragStart, col,
 }: {
   demanda:     DemandaFoco
   isDragging:  boolean
@@ -100,9 +132,7 @@ function DemandaCard({
 
   useEffect(() => {
     if (col !== "EM_ANDAMENTO" || !demanda.focoIniciadoEm) return
-    const iv = setInterval(() => {
-      setElapsed(formatDuracao(demanda.focoIniciadoEm!))
-    }, 30000)
+    const iv = setInterval(() => setElapsed(formatDuracao(demanda.focoIniciadoEm!)), 30000)
     return () => clearInterval(iv)
   }, [col, demanda.focoIniciadoEm])
 
@@ -123,7 +153,6 @@ function DemandaCard({
         }
       `}
     >
-      {/* Tipo + prioridade */}
       <div className="flex items-center gap-2 mb-2">
         <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${TIPO_COLOR[demanda.tipo]}`}>
           <TipoIcon size={10} strokeWidth={2.5} />
@@ -136,7 +165,6 @@ function DemandaCard({
         )}
       </div>
 
-      {/* Título */}
       <Link
         href={`/app/${demanda.id}`}
         className="block text-sm font-semibold text-slate-800 leading-snug hover:text-violet-700 transition-colors mb-2 pr-4"
@@ -145,7 +173,6 @@ function DemandaCard({
         {demanda.titulo}
       </Link>
 
-      {/* Prazo */}
       {prazoText && (
         <div className={`flex items-center gap-1 text-xs font-medium mb-2 ${urgente ? "text-red-600" : "text-slate-400"}`}>
           {urgente && <AlertCircle size={11} strokeWidth={2.5} />}
@@ -154,15 +181,15 @@ function DemandaCard({
         </div>
       )}
 
-      {/* Timer — só em EM_ANDAMENTO */}
       {col === "EM_ANDAMENTO" && demanda.focoIniciadoEm && (
         <div className="flex items-center gap-1.5 mt-2 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-semibold text-emerald-700">Em foco há {elapsed || formatDuracao(demanda.focoIniciadoEm)}</span>
+          <span className="text-xs font-semibold text-emerald-700">
+            Em foco há {elapsed || formatDuracao(demanda.focoIniciadoEm)}
+          </span>
         </div>
       )}
 
-      {/* Motivo de espera */}
       {col === "EM_ESPERA" && demanda.focoMotivoEspera && (
         <div className="mt-2 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
           <PauseCircle size={11} strokeWidth={2} className="mt-0.5 shrink-0" />
@@ -170,7 +197,6 @@ function DemandaCard({
         </div>
       )}
 
-      {/* Link discreto */}
       <ChevronRight
         size={14}
         strokeWidth={2}
@@ -180,20 +206,11 @@ function DemandaCard({
   )
 }
 
-// ── Coluna do board ───────────────────────────────────────────────────────────
+// ── Coluna ───────────────────────────────────────────────────────────────────
 
 function Coluna({
-  titulo,
-  status,
-  icon: Icon,
-  cor,
-  demandas,
-  dragId,
-  dragOver,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
+  titulo, status, icon: Icon, cor, demandas,
+  dragId, dragOver, onDragStart, onDragOver, onDragLeave, onDrop,
 }: {
   titulo:      string
   status:      Status
@@ -211,7 +228,6 @@ function Coluna({
 
   return (
     <div className="flex flex-col gap-0 min-h-0">
-      {/* Cabeçalho */}
       <div className="flex items-center gap-2.5 mb-3">
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${cor}`}>
           <Icon size={14} strokeWidth={2.5} />
@@ -227,7 +243,6 @@ function Coluna({
         )}
       </div>
 
-      {/* Área de drop */}
       <div
         onDragOver={(e) => onDragOver(e, status)}
         onDragLeave={onDragLeave}
@@ -268,18 +283,14 @@ function Coluna({
   )
 }
 
-// ── Modal de motivo de espera ─────────────────────────────────────────────────
+// ── Modal de motivo ───────────────────────────────────────────────────────────
 
-function MotivoPauseModal({
-  onConfirm,
-  onCancel,
-}: {
+function MotivoPauseModal({ onConfirm, onCancel }: {
   onConfirm: (motivo: string) => void
   onCancel:  () => void
 }) {
   const [motivo, setMotivo] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
-
   useEffect(() => { inputRef.current?.focus() }, [])
 
   return (
@@ -297,7 +308,6 @@ function MotivoPauseModal({
             <X size={18} strokeWidth={2} />
           </button>
         </div>
-
         <input
           ref={inputRef}
           type="text"
@@ -308,7 +318,6 @@ function MotivoPauseModal({
           className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300"
           maxLength={255}
         />
-
         <div className="flex gap-2 mt-4">
           <button
             onClick={onCancel}
@@ -331,44 +340,59 @@ function MotivoPauseModal({
 
 // ── Board principal ───────────────────────────────────────────────────────────
 
+const TIPO_FILTROS: { valor: Tipo | "TODOS"; label: string }[] = [
+  { valor: "TODOS",   label: "Todos" },
+  { valor: "DEMANDA", label: "Demandas" },
+  { valor: "TAREFA",  label: "Tarefas" },
+  { valor: "IDEIA",   label: "Ideias" },
+]
+
+const ORDENACOES: { valor: Ordenacao; label: string }[] = [
+  { valor: "PADRAO",      label: "Padrão (prioridade + prazo)" },
+  { valor: "IMPORTANCIA", label: "Importância" },
+  { valor: "VENCIMENTO",  label: "Vencimento (mais próximo)" },
+  { valor: "CRIACAO",     label: "Criação (mais antigo)" },
+]
+
 export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco[] }) {
   const router = useRouter()
 
-  const [itens,    setItens]    = useState<DemandaFoco[]>(inicial)
-  const [dragId,   setDragId]   = useState<number | null>(null)
-  const [dragOver, setDragOver] = useState<Status | null>(null)
-  const [loading,  setLoading]  = useState<number | null>(null)
-
-  // Estado do modal de motivo
+  const [itens,         setItens]         = useState<DemandaFoco[]>(inicial)
+  const [dragId,        setDragId]        = useState<number | null>(null)
+  const [dragOver,      setDragOver]      = useState<Status | null>(null)
+  const [loading,       setLoading]       = useState<number | null>(null)
   const [pendingEspera, setPendingEspera] = useState<{ id: number; de: Status } | null>(null)
+  const [filtroTipo,    setFiltroTipo]    = useState<Tipo | "TODOS">("TODOS")
+  const [ordenacao,     setOrdenacao]     = useState<Ordenacao>("PADRAO")
 
-  const aFazer    = itens.filter((d) => d.status === "ABERTA")
-  const emFoco    = itens.filter((d) => d.status === "EM_ANDAMENTO")
-  const emEspera  = itens.filter((d) => d.status === "EM_ESPERA")
+  const itensFiltrados = useMemo(() => {
+    const filtrados = filtroTipo === "TODOS"
+      ? itens
+      : itens.filter((d) => d.tipo === filtroTipo)
+    return aplicarOrdenacao(filtrados, ordenacao)
+  }, [itens, filtroTipo, ordenacao])
+
+  const aFazer   = itensFiltrados.filter((d) => d.status === "ABERTA")
+  const emFoco   = itensFiltrados.filter((d) => d.status === "EM_ANDAMENTO")
+  const emEspera = itensFiltrados.filter((d) => d.status === "EM_ESPERA")
 
   function onDragStart(e: React.DragEvent, id: number) {
     setDragId(id)
     e.dataTransfer.effectAllowed = "move"
   }
-
   function onDragOver(e: React.DragEvent, col: Status) {
     e.preventDefault()
     e.dataTransfer.dropEffect = "move"
     setDragOver(col)
   }
-
-  function onDragLeave() {
-    setDragOver(null)
-  }
+  function onDragLeave() { setDragOver(null) }
 
   async function moverPara(id: number, novoStatus: Status, motivo?: string) {
     const demanda = itens.find((d) => d.id === id)
     if (!demanda || demanda.status === novoStatus) return
-
     const deStatus = demanda.status
+    const agora    = new Date().toISOString()
 
-    // Atualiza otimisticamente
-    const agora = new Date().toISOString()
     setItens((prev) =>
       prev.map((d) =>
         d.id === id
@@ -376,7 +400,7 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
               ...d,
               status:           novoStatus,
               focoIniciadoEm:   novoStatus === "EM_ANDAMENTO" ? agora : null,
-              focoMotivoEspera: novoStatus === "EM_ESPERA"    ? (motivo ?? null) : d.focoMotivoEspera,
+              focoMotivoEspera: novoStatus === "EM_ESPERA" ? (motivo ?? null) : d.focoMotivoEspera,
             }
           : d
       )
@@ -385,22 +409,15 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
     setLoading(id)
     try {
       const body: Record<string, unknown> = { status: novoStatus }
-      if (novoStatus === "EM_ESPERA" && motivo !== undefined) {
-        body.focoMotivoEspera = motivo
-      }
+      if (novoStatus === "EM_ESPERA" && motivo !== undefined) body.focoMotivoEspera = motivo
       const res = await fetch(`/api/demandas/${id}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(body),
       })
-      if (!res.ok) throw new Error("Falha ao atualizar")
+      if (!res.ok) throw new Error()
     } catch {
-      // Reverte em caso de erro
-      setItens((prev) =>
-        prev.map((d) =>
-          d.id === id ? { ...d, status: deStatus } : d
-        )
-      )
+      setItens((prev) => prev.map((d) => d.id === id ? { ...d, status: deStatus } : d))
     } finally {
       setLoading(null)
       router.refresh()
@@ -412,16 +429,9 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
     if (dragId === null) return
     const id = dragId
     setDragId(null)
-
     const demanda = itens.find((d) => d.id === id)
     if (!demanda || demanda.status === col) return
-
-    // Ao mover para EM_ESPERA, pede motivo
-    if (col === "EM_ESPERA") {
-      setPendingEspera({ id, de: demanda.status })
-      return
-    }
-
+    if (col === "EM_ESPERA") { setPendingEspera({ id, de: demanda.status }); return }
     moverPara(id, col)
   }
 
@@ -431,19 +441,71 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
     setPendingEspera(null)
   }
 
-  function cancelarEspera() {
-    setPendingEspera(null)
-    setDragId(null)
-  }
+  const totalVisiveis = itensFiltrados.length
+  const totalGeral    = itens.length
 
   return (
     <div className="flex flex-col h-full p-4 md:p-8 max-w-7xl">
-      {/* ── Cabeçalho ─────────────────────────────────────────────────────── */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Foco</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Arraste os itens para organizar o que está fazendo agora
-        </p>
+
+      {/* ── Cabeçalho ──────────────────────────────────────────────────────── */}
+      <div className="mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Foco</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Arraste os itens para organizar o que está fazendo agora
+              {filtroTipo !== "TODOS" && (
+                <span className="ml-1 text-violet-600 font-medium">
+                  — mostrando {totalVisiveis} de {totalGeral}
+                </span>
+              )}
+            </p>
+          </div>
+
+          {/* Ordenação */}
+          <div className="flex items-center gap-2 shrink-0">
+            <ArrowUpDown size={14} strokeWidth={2} className="text-slate-400" />
+            <select
+              value={ordenacao}
+              onChange={(e) => setOrdenacao(e.target.value as Ordenacao)}
+              className="text-xs font-medium text-gray-800 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-300 cursor-pointer"
+            >
+              {ORDENACOES.map((o) => (
+                <option key={o.valor} value={o.valor}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Filtro por tipo */}
+        <div className="flex gap-2 mt-4 flex-wrap">
+          {TIPO_FILTROS.map(({ valor, label }) => {
+            const ativo = filtroTipo === valor
+            const corAtivo = valor === "TODOS"
+              ? "bg-slate-800 text-white"
+              : TIPO_ATIVO[valor as Tipo]
+            return (
+              <button
+                key={valor}
+                onClick={() => setFiltroTipo(valor)}
+                className={`
+                  inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full
+                  border transition-all duration-150
+                  ${ativo
+                    ? `${corAtivo} border-transparent shadow-sm`
+                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                  }
+                `}
+              >
+                {valor !== "TODOS" && (() => {
+                  const Icon = TIPO_ICON[valor as Tipo]
+                  return <Icon size={11} strokeWidth={2.5} />
+                })()}
+                {label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {loading !== null && (
@@ -453,7 +515,7 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
         </div>
       )}
 
-      {/* ── Três colunas ──────────────────────────────────────────────────── */}
+      {/* ── Três colunas ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1 min-h-0">
         <Coluna
           titulo="A Fazer"
@@ -497,7 +559,10 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
       </div>
 
       {pendingEspera && (
-        <MotivoPauseModal onConfirm={confirmarEspera} onCancel={cancelarEspera} />
+        <MotivoPauseModal
+          onConfirm={confirmarEspera}
+          onCancel={() => { setPendingEspera(null); setDragId(null) }}
+        />
       )}
     </div>
   )

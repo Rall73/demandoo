@@ -26,6 +26,7 @@ export default async function FocoPage() {
       delegadoNome:     true,
       focoIniciadoEm:   true,
       focoMotivoEspera: true,
+      createdAt:        true,
     },
     orderBy: [{ prioridade: "asc" }, { prazo: "asc" }, { createdAt: "desc" }],
     take: 200,
@@ -41,6 +42,7 @@ export default async function FocoPage() {
     delegadoNome:     d.delegadoNome,
     focoIniciadoEm:   d.focoIniciadoEm?.toISOString() ?? null,
     focoMotivoEspera: d.focoMotivoEspera,
+    createdAt:        d.createdAt.toISOString(),
   }))
 
   return <FocoBoard demandas={serialized} />
