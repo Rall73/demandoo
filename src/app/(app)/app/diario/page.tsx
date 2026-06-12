@@ -1,6 +1,6 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { hojeISOBrasil, parseDateBRT } from "@/lib/date"
+import { hojeISOBrasil, parseDateBRT, toDateBRT } from "@/lib/date"
 import DiarioClient from "./DiarioClient"
 
 export async function generateMetadata({
@@ -23,17 +23,21 @@ export default async function DiarioPage({
   const companyId = session!.user.companyId
   const userId    = Number(session!.user.id)
 
+  const hojeISO = hojeISOBrasil()
+
   const { data: dataParam } = await searchParams
-  const dataISO   = dataParam ?? hojeISOBrasil()
+  // Nunca mostra datas futuras — limita ao dia de hoje
+  const dataISO   = (dataParam && dataParam <= hojeISO) ? dataParam : hojeISO
   const inicioDia = parseDateBRT(dataISO)
   const fimDia    = new Date(inicioDia.getTime() + 24 * 60 * 60 * 1000)
 
-  // Formato legível passado para o client (evita recalcular no browser)
+  const ehUltimoDia = dataISO >= hojeISO
+
   const dataFormatada = new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day:     "2-digit",
-    month:   "2-digit",
-    year:    "numeric",
+    weekday:  "long",
+    day:      "2-digit",
+    month:    "2-digit",
+    year:     "numeric",
     timeZone: "America/Sao_Paulo",
   }).format(inicioDia)
 
@@ -56,18 +60,34 @@ export default async function DiarioPage({
         companyId,
         userId,
         titulo,
-        tipo:      "DIARIO",
-        status:    "ABERTA",
-        prazo:     inicioDia,
+        tipo:       "DIARIO",
+        status:     "ABERTA",
+        prazo:      inicioDia,
         prioridade: "MEDIA",
       },
       select: { id: true },
     })
   }
 
+  // Dia anterior mais recente que tenha ao menos 1 entrada registrada
+  const diarioAnterior = await prisma.demanda.findFirst({
+    where: {
+      companyId,
+      userId,
+      tipo:      "DIARIO",
+      deletedAt: null,
+      prazo:     { lt: inicioDia },
+      comentarios: {
+        some: { deletedAt: null, tipo: { notIn: ["STATUS"] } },
+      },
+    },
+    orderBy: { prazo: "desc" },
+    select:  { prazo: true },
+  })
+  const prevData = diarioAnterior?.prazo ? toDateBRT(diarioAnterior.prazo) : null
+
   // Busca paralela de todos os dados do dia
   const [demandasHoje, acoesHoje, comentarios, sessoesHoje] = await Promise.all([
-    // Demandas/tarefas com prazo hoje
     prisma.demanda.findMany({
       where: {
         companyId,
@@ -77,11 +97,10 @@ export default async function DiarioPage({
         status:    { notIn: ["CONCLUIDA", "CANCELADA"] },
         prazo:     { gte: inicioDia, lt: fimDia },
       },
-      select: { id: true, titulo: true, tipo: true, status: true, prioridade: true },
+      select:  { id: true, titulo: true, tipo: true, status: true, prioridade: true },
       orderBy: [{ prioridade: "asc" }, { titulo: "asc" }],
     }),
 
-    // Ações com prazo hoje
     prisma.acaoDemanda.findMany({
       where: {
         deletedAt: null,
@@ -90,34 +109,22 @@ export default async function DiarioPage({
         demanda:   { companyId, userId, deletedAt: null },
       },
       select: {
-        id:       true,
+        id:        true,
         descricao: true,
-        feita:    true,
-        demanda:  { select: { id: true, titulo: true, tipo: true } },
+        feita:     true,
+        demanda:   { select: { id: true, titulo: true, tipo: true } },
       },
     }),
 
-    // Entradas do diário (comentários da demanda DIARIO)
     prisma.comentario.findMany({
-      where: {
-        demandaId: diario.id,
-        deletedAt: null,
-        tipo:      { notIn: ["STATUS"] },
-      },
+      where:   { demandaId: diario.id, deletedAt: null, tipo: { notIn: ["STATUS"] } },
       orderBy: { createdAt: "asc" },
       select:  { id: true, conteudo: true, tipo: true, createdAt: true },
     }),
 
-    // Sessões de foco do dia
     prisma.sessaoFoco.findMany({
-      where: {
-        companyId,
-        userId,
-        iniciadoEm: { gte: inicioDia, lt: fimDia },
-      },
-      include: {
-        demanda: { select: { id: true, titulo: true, tipo: true } },
-      },
+      where:   { companyId, userId, iniciadoEm: { gte: inicioDia, lt: fimDia } },
+      include: { demanda: { select: { id: true, titulo: true, tipo: true } } },
     }),
   ])
 
@@ -137,11 +144,13 @@ export default async function DiarioPage({
       dataISO={dataISO}
       dataFormatada={dataFormatada}
       diarioId={diario.id}
+      prevData={prevData}
+      ehUltimoDia={ehUltimoDia}
       demandasHoje={demandasHoje.map((d) => ({
-        id:        d.id,
-        titulo:    d.titulo,
-        tipo:      d.tipo as string,
-        status:    d.status as string,
+        id:         d.id,
+        titulo:     d.titulo,
+        tipo:       d.tipo as string,
+        status:     d.status as string,
         prioridade: d.prioridade as string,
       }))}
       acoesHoje={acoesHoje.map((a) => ({

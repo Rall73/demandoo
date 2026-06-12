@@ -1,9 +1,13 @@
 @AGENTS.md
 
-## Projeto: demandoo.net
+## demandoo.net
 
 SaaS standalone de captura de demandas, tarefas e ideias com IA.
 Stack: Next.js 16 (App Router) + Prisma + MySQL + Auth.js v5 + OpenAI + Cloudinary
+
+Consulte antes de planejar qualquer feature:
+- `_docs/ARCHITECTURE.md` — modelos, APIs, fluxos, armadilhas conhecidas
+- `_docs/PIPELINE.md` — o que está feito e o que vem a seguir
 
 ---
 
