@@ -7,8 +7,9 @@ import {
   Clock, CheckCircle2, Timer,
 } from "lucide-react"
 import PrintButton from "./PrintButton"
+import AutoPrint   from "./AutoPrint"
 
-type Ctx = { params: Promise<{ data: string }> }
+type Ctx = { params: Promise<{ data: string }>; searchParams: Promise<{ pdf?: string }> }
 
 const ENTRADA_LABEL: Record<string, string> = {
   TELEFONEMA: "Telefonemas",
@@ -48,8 +49,9 @@ function formatHoraBRT(d: Date): string {
   })
 }
 
-export default async function DiarioImprimirPage({ params }: Ctx) {
-  const { data: dataParam } = await params
+export default async function DiarioImprimirPage({ params, searchParams }: Ctx) {
+  const { data: dataParam }  = await params
+  const { pdf }              = await searchParams
 
   const session     = await auth()
   const companyId   = session!.user.companyId
@@ -129,8 +131,6 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
             color: #94a3b8;
             background: white;
           }
-          .page-num::after    { content: counter(page); }
-          .pages-total::after { content: counter(pages); }
           /* Quebra de página */
           h2 { break-after: avoid; }
           h3 { break-after: avoid; }
@@ -144,7 +144,7 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
 
         {/* Botões de exportação — só na tela */}
         <div className="no-print flex justify-end mb-6">
-          <PrintButton dataISO={dataISO} nomeUsuario={nomeUsuario} />
+          <PrintButton dataISO={dataISO} />
         </div>
 
         {/* ── Cabeçalho ─────────────────────────────────────────────────── */}
@@ -259,8 +259,12 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
       {/* ── Rodapé impresso ───────────────────────────────────────────────── */}
       <div className="print-footer">
         <span>demandoo</span>
-        <span>Página <span className="page-num" /> de <span className="pages-total" /></span>
       </div>
+
+      {/* Auto-print quando vindo do botão PDF do Diário */}
+      {pdf === "1" && (
+        <AutoPrint title={`${dataISO} - Diário ${nomeUsuario}`} />
+      )}
     </>
   )
 }

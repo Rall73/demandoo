@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  ChevronLeft, ChevronRight, Printer,
+  ChevronLeft, ChevronRight, Printer, FileText, FileDown,
   Phone, Mail, Users2, PenLine,
   Inbox, CheckSquare, Lightbulb,
   Clock, Trash2, Plus, Send, Loader2,
@@ -313,14 +313,32 @@ export default function DiarioClient({
           )}
         </div>
 
-        <Link
-          href={`/diario/${dataISO}/imprimir`}
-          target="_blank"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
-        >
-          <Printer size={14} strokeWidth={2} />
-          Imprimir
-        </Link>
+        <div className="flex items-center gap-1">
+          <Link
+            href={`/diario/${dataISO}/imprimir`}
+            target="_blank"
+            title="Imprimir"
+            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors"
+          >
+            <Printer size={15} strokeWidth={2} />
+          </Link>
+          <Link
+            href={`/diario/${dataISO}/imprimir?pdf=1`}
+            target="_blank"
+            title="Exportar PDF"
+            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors"
+          >
+            <FileText size={15} strokeWidth={2} />
+          </Link>
+          <a
+            href={`/api/diario/${dataISO}/exportar-doc`}
+            download
+            title="Exportar Word (.doc)"
+            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors"
+          >
+            <FileDown size={15} strokeWidth={2} />
+          </a>
+        </div>
       </div>
 
       {/* ── Dois painéis ───────────────────────────────────────────────────── */}

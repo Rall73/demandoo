@@ -150,13 +150,20 @@ export async function GET(_: Request, { params }: Ctx) {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <!--[if gte mso 9]><xml>
+    <w:WordDocument><w:DoNotOptimizeForBrowser/></w:WordDocument>
+  </xml><![endif]-->
   <style>
+    @page Section1 {
+      mso-footer: f1;
+      mso-footer-margin: 1cm;
+      margin: 2cm 2cm 3cm 2cm;
+    }
+    div.Section1 { page: Section1; }
     body {
       font-family: Arial, Helvetica, sans-serif;
       font-size: 11pt;
       color: #1e293b;
-      margin: 0;
-      padding: 0;
     }
     .cabecalho {
       border-bottom: 2px solid #1e293b;
@@ -168,11 +175,7 @@ export async function GET(_: Request, { params }: Ctx) {
       margin: 0 0 4pt 0;
       text-transform: capitalize;
     }
-    .subtitulo {
-      font-size: 10pt;
-      color: #64748b;
-      margin: 0;
-    }
+    .subtitulo { font-size: 10pt; color: #64748b; margin: 0; }
     h2 {
       font-size: 8pt;
       color: #64748b;
@@ -189,33 +192,42 @@ export async function GET(_: Request, { params }: Ctx) {
       margin: 12pt 0 4pt 0;
       page-break-after: avoid;
     }
-    table { page-break-inside: auto; }
+    table { page-break-inside: auto; width: 100%; border-collapse: collapse; }
     tr    { page-break-inside: avoid; }
-    .rodape {
-      border-top: 1px solid #e2e8f0;
-      padding-top: 6pt;
-      margin-top: 24pt;
+    p.MsoFooter {
+      font-family: Arial, sans-serif;
       font-size: 9pt;
       color: #94a3b8;
-      display: flex;
-      justify-content: space-between;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 4pt;
+      margin: 0;
     }
   </style>
 </head>
 <body>
-  <div class="cabecalho">
-    <h1>${dataFormatada}</h1>
-    <p class="subtitulo">Diário &mdash; ${nomeUsuario}</p>
+  <!-- Definição do rodapé Word -->
+  <div style="mso-element:footer" id="f1">
+    <p class="MsoFooter">
+      demandoo
+      <span style="mso-tab-count:2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+      P&aacute;gina
+      <span style="mso-field-code:PAGE \* Arabic \* MERGEFORMAT ">1</span>
+      de
+      <span style="mso-field-code:NUMPAGES \* Arabic \* MERGEFORMAT ">1</span>
+    </p>
   </div>
 
-  ${secAgenda}
-  ${secAcoes}
-  ${secTempo}
-  ${secRegistros}
+  <!-- Conteúdo principal -->
+  <div class="Section1">
+    <div class="cabecalho">
+      <h1>${dataFormatada}</h1>
+      <p class="subtitulo">Di&aacute;rio &mdash; ${nomeUsuario}</p>
+    </div>
 
-  <div class="rodape">
-    <span>demandoo</span>
-    <span>${dataISO}</span>
+    ${secAgenda}
+    ${secAcoes}
+    ${secTempo}
+    ${secRegistros}
   </div>
 </body>
 </html>`
