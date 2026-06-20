@@ -118,19 +118,6 @@ export default async function DiarioImprimirPage({ params, searchParams }: Ctx) 
         }
         @media print {
           .no-print { display: none !important; }
-          /* Rodapé fixo em todas as páginas */
-          .print-footer {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 0;
-            border-top: 1px solid #e2e8f0;
-            font-size: 9pt;
-            color: #94a3b8;
-            background: white;
-          }
           /* Quebra de página */
           h2 { break-after: avoid; }
           h3 { break-after: avoid; }
@@ -150,7 +137,7 @@ export default async function DiarioImprimirPage({ params, searchParams }: Ctx) 
         {/* ── Cabeçalho ─────────────────────────────────────────────────── */}
         <div className="border-b-2 border-slate-900 pb-4 mb-7">
           <h1 className="text-2xl font-bold capitalize">{dataFormatada}</h1>
-          <p className="text-slate-500 text-sm mt-1 font-medium">Diário — {nomeUsuario}</p>
+          <p className="text-slate-500 text-sm mt-1 font-medium">Diário demandoo — {nomeUsuario}</p>
         </div>
 
         {/* ── Agenda do dia ─────────────────────────────────────────────── */}
@@ -254,11 +241,6 @@ export default async function DiarioImprimirPage({ params, searchParams }: Ctx) 
           <p className="text-slate-400 italic">Nenhum registro para este dia.</p>
         )}
 
-      </div>
-
-      {/* ── Rodapé impresso ───────────────────────────────────────────────── */}
-      <div className="print-footer">
-        <span>demandoo</span>
       </div>
 
       {/* Auto-print quando vindo do botão PDF do Diário */}
