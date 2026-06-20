@@ -141,6 +141,7 @@ export default async function DiarioPage({
 
   return (
     <DiarioClient
+      key={dataISO}
       dataISO={dataISO}
       dataFormatada={dataFormatada}
       diarioId={diario.id}
