@@ -51,9 +51,9 @@ function formatHoraBRT(d: Date): string {
 export default async function DiarioImprimirPage({ params }: Ctx) {
   const { data: dataParam } = await params
 
-  const session    = await auth()
-  const companyId  = session!.user.companyId
-  const userId     = Number(session!.user.id)
+  const session     = await auth()
+  const companyId   = session!.user.companyId
+  const userId      = Number(session!.user.id)
   const nomeUsuario = session!.user.name ?? ""
 
   const dataISO   = dataParam
@@ -72,14 +72,14 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
 
   const [demandasHoje, acoesHoje, comentarios, sessoesHoje] = await Promise.all([
     prisma.demanda.findMany({
-      where: { companyId, userId, deletedAt: null, tipo: { not: "DIARIO" },
-               status: { notIn: ["CONCLUIDA", "CANCELADA"] }, prazo: { gte: inicioDia, lt: fimDia } },
-      select: { id: true, titulo: true, tipo: true, prioridade: true, status: true },
+      where:   { companyId, userId, deletedAt: null, tipo: { not: "DIARIO" },
+                 status: { notIn: ["CONCLUIDA", "CANCELADA"] }, prazo: { gte: inicioDia, lt: fimDia } },
+      select:  { id: true, titulo: true, tipo: true, prioridade: true, status: true },
       orderBy: [{ prioridade: "asc" }, { titulo: "asc" }],
     }),
     prisma.acaoDemanda.findMany({
-      where: { deletedAt: null, feita: false, prazo: { gte: inicioDia, lt: fimDia },
-               demanda: { companyId, userId, deletedAt: null } },
+      where:  { deletedAt: null, feita: false, prazo: { gte: inicioDia, lt: fimDia },
+                demanda: { companyId, userId, deletedAt: null } },
       select: { id: true, descricao: true, feita: true,
                 demanda: { select: { id: true, titulo: true, tipo: true } } },
     }),
@@ -109,7 +109,6 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
 
   return (
     <>
-      {/* Estilos de impressão */}
       <style>{`
         @page {
           size: A4;
@@ -117,11 +116,10 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
         }
         @media print {
           .no-print { display: none !important; }
+          /* Rodapé fixo em todas as páginas */
           .print-footer {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            bottom: 0; left: 0; right: 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -131,33 +129,33 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
             color: #94a3b8;
             background: white;
           }
-          .page-num::after {
-            content: counter(page);
-          }
-          .pages-total::after {
-            content: counter(pages);
-          }
+          .page-num::after    { content: counter(page); }
+          .pages-total::after { content: counter(pages); }
+          /* Quebra de página */
+          h2 { break-after: avoid; }
+          h3 { break-after: avoid; }
+          .entry-row   { break-inside: avoid; }
+          .tipo-group  { break-inside: avoid; }
+          section.compact { break-inside: avoid; }
         }
       `}</style>
 
       <div className="bg-white min-h-screen p-10 max-w-2xl mx-auto text-sm text-slate-900">
 
-        {/* Botão imprimir — só na tela */}
+        {/* Botões de exportação — só na tela */}
         <div className="no-print flex justify-end mb-6">
-          <PrintButton />
+          <PrintButton dataISO={dataISO} nomeUsuario={nomeUsuario} />
         </div>
 
         {/* ── Cabeçalho ─────────────────────────────────────────────────── */}
         <div className="border-b-2 border-slate-900 pb-4 mb-7">
           <h1 className="text-2xl font-bold capitalize">{dataFormatada}</h1>
-          <p className="text-slate-500 text-sm mt-1 font-medium">
-            Diário — {nomeUsuario}
-          </p>
+          <p className="text-slate-500 text-sm mt-1 font-medium">Diário — {nomeUsuario}</p>
         </div>
 
-        {/* ── Agenda do dia (Vence hoje) ─────────────────────────────────── */}
+        {/* ── Agenda do dia ─────────────────────────────────────────────── */}
         {demandasHoje.length > 0 && (
-          <section className="mb-6">
+          <section className="compact mb-6">
             <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-3">
               <Clock size={11} strokeWidth={2.5} />
               Agenda do dia
@@ -166,7 +164,7 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
               {demandasHoje.map((d) => {
                 const Icon = TIPO_ICON[d.tipo] ?? Inbox
                 return (
-                  <div key={d.id} className="flex items-start gap-2 py-1.5 border-b border-slate-100 last:border-0">
+                  <div key={d.id} className="entry-row flex items-start gap-2 py-1.5 border-b border-slate-100 last:border-0">
                     <span className={`inline-flex items-center justify-center w-5 h-5 rounded shrink-0 mt-0.5 ${TIPO_COR[d.tipo] ?? ""}`}>
                       <Icon size={10} strokeWidth={2.5} />
                     </span>
@@ -180,14 +178,14 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
 
         {/* ── Ações de hoje ─────────────────────────────────────────────── */}
         {acoesHoje.length > 0 && (
-          <section className="mb-6">
+          <section className="compact mb-6">
             <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-3">
               <CheckCircle2 size={11} strokeWidth={2.5} />
               Ações de hoje
             </h2>
             <div className="flex flex-col">
               {acoesHoje.map((a) => (
-                <div key={a.id} className="flex items-start gap-2 py-1.5 border-b border-slate-100 last:border-0">
+                <div key={a.id} className="entry-row flex items-start gap-2 py-1.5 border-b border-slate-100 last:border-0">
                   <span className="w-4 h-4 rounded-full border-2 border-slate-300 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-slate-800 leading-snug">{a.descricao}</p>
@@ -201,14 +199,14 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
 
         {/* ── Tempo de foco ─────────────────────────────────────────────── */}
         {resumoTempo.length > 0 && (
-          <section className="mb-6">
+          <section className="compact mb-6">
             <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-3">
               <Timer size={11} strokeWidth={2.5} />
               Tempo de foco — {formatMin(totalMin)}
             </h2>
             <div className="flex flex-col">
               {resumoTempo.map((r) => (
-                <div key={r.demandaId} className="flex items-center justify-between gap-4 py-1.5 border-b border-slate-100 last:border-0">
+                <div key={r.demandaId} className="entry-row flex items-center justify-between gap-4 py-1.5 border-b border-slate-100 last:border-0">
                   <p className="text-slate-700">{r.titulo}</p>
                   <span className="text-xs font-semibold text-slate-600 shrink-0">{formatMin(r.totalMin)}</span>
                 </div>
@@ -217,27 +215,26 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
           </section>
         )}
 
-        {/* ── Registros do dia (agrupados por tipo) ─────────────────────── */}
+        {/* ── Registros do dia ──────────────────────────────────────────── */}
         {comentarios.length > 0 && (
           <section className="mb-6">
             <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-4">
               <PenLine size={11} strokeWidth={2.5} />
               Registros do dia
             </h2>
-
             <div className="flex flex-col gap-5">
               {(["TELEFONEMA", "EMAIL", "REUNIAO", "NOTA"] as const).map((tipo) => {
                 const itens = comentarios.filter((c) => c.tipo === tipo)
                 if (itens.length === 0) return null
                 return (
-                  <div key={tipo}>
+                  <div key={tipo} className="tipo-group">
                     <h3 className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                       <EntradaIcon tipo={tipo} />
                       {ENTRADA_LABEL[tipo]}
                     </h3>
                     <div className="flex flex-col">
                       {itens.map((c) => (
-                        <div key={c.id} className="flex gap-3 py-1.5 border-b border-slate-100 last:border-0">
+                        <div key={c.id} className="entry-row flex gap-3 py-1.5 border-b border-slate-100 last:border-0">
                           <span className="text-xs text-slate-400 shrink-0 w-10 pt-0.5">
                             {formatHoraBRT(c.createdAt)}
                           </span>
@@ -252,7 +249,6 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
           </section>
         )}
 
-        {/* Mensagem vazia */}
         {demandasHoje.length === 0 && acoesHoje.length === 0 &&
          resumoTempo.length === 0 && comentarios.length === 0 && (
           <p className="text-slate-400 italic">Nenhum registro para este dia.</p>
@@ -260,12 +256,10 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
 
       </div>
 
-      {/* ── Rodapé — fixo em todas as páginas impressas ─────────────────── */}
-      <div className="print-footer no-print-hide">
+      {/* ── Rodapé impresso ───────────────────────────────────────────────── */}
+      <div className="print-footer">
         <span>demandoo</span>
-        <span>
-          Página <span className="page-num" /> de <span className="pages-total" />
-        </span>
+        <span>Página <span className="page-num" /> de <span className="pages-total" /></span>
       </div>
     </>
   )
