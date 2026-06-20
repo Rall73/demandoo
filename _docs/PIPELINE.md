@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-05-25 (v1.0)
+> **Última atualização:** 2026-06-20 (v1.4.2)
 
 ---
 
@@ -249,7 +249,8 @@ ALTER TABLE `demandas`
 | `/api/demandas/[id]/acoes/[acaoId]` | PATCH, DELETE | ✅ |
 | `/api/demandas/[id]/calendar.ics` | GET | ✅ |
 | `/api/demandas/[id]/comentarios` | GET, POST | ✅ |
-| `/api/demandas/[id]/comentarios/[cId]` | DELETE | ✅ |
+| `/api/demandas/[id]/comentarios/[cId]` | PATCH (editar), DELETE | ✅ |
+| `/api/diario/[data]/exportar-doc` | GET (gera `.doc` Word) | ✅ |
 | `/api/demandas/[id]/relatorio` | POST (gerar IA), PATCH (salvar edição) | ✅ |
 | `/api/upload/audio` | POST | ✅ |
 | `/api/upload/avatar` | POST | ✅ |
@@ -319,6 +320,42 @@ ALTER TABLE `demandas`
 | Itens concluídos colapsados em seção separada | ✅ |
 | Campos extras por tipo: data + lembrete (VENCIMENTOS/LEMBRETES), link (COMPRAS) | ✅ |
 | Sidebar: entrada "Listas" com ícone `ListChecks` | ✅ |
+
+### ✅ 4.19 Quadro de Foco (v1.3 + v1.3.1)
+
+| Item | Status |
+|---|---|
+| Quadro Kanban `/app/foco` — colunas por status (ABERTA / EM_ANDAMENTO / CONCLUIDA) | ✅ |
+| Drag-and-drop entre colunas (move demanda + atualiza status via PATCH) | ✅ |
+| Filtros por tipo (DEMANDA / TAREFA / IDEIA) e ordenação (prazo, prioridade, criação) | ✅ |
+| Cards com badges de tipo, prioridade, prazo e contagem de ações | ✅ |
+| Sessões de foco: cronômetro por card, salva `sessoes_foco` com `duracaoMin` | ✅ |
+| Sidebar: entrada "Foco" com ícone `Timer` | ✅ |
+
+### ✅ 4.20 Módulo Diário (v1.4 + v1.4.1 + v1.4.2)
+
+| Item | Status |
+|---|---|
+| Página `/app/diario` — visão do dia com painel esquerdo (agenda/ações/foco) e direito (registros) | ✅ |
+| Navegação entre dias (anterior / próximo) com clamp no dia de hoje | ✅ |
+| Bug fix: `key={dataISO}` no `DiarioClient` evita `useState` congelado ao navegar | ✅ |
+| Painel esquerdo: demandas com prazo hoje, ações pendentes hoje, resumo de tempo de foco | ✅ |
+| Painel direito: timeline de registros do dia (tipo DIARIO) — TELEFONEMA / EMAIL / REUNIAO / NOTA | ✅ |
+| Criar registro com selector de tipo + textarea + Ctrl+Enter | ✅ |
+| Edição inline de registros (lápis → textarea → salva via PATCH `/comentarios/[id]`) | ✅ |
+| Soft delete de registros (lixeira) | ✅ |
+| Botão "+ Demanda" por registro abre modal de nova captura vinculada ao contexto | ✅ |
+| Criação automática do `DIARIO` do dia (tipo `DIARIO` no model `Demanda`) | ✅ |
+| Página de impressão `/diario/[data]/imprimir` — coluna única, sem sidebar | ✅ |
+| Layout impresso: Agenda → Ações → Tempo de foco → Registros por tipo | ✅ |
+| Subtítulo no cabeçalho: "Diário demandoo — Nome do usuário" | ✅ |
+| Exportar PDF: ícone no Diário abre página de impressão com `?pdf=1` → auto-dispara `window.print()` | ✅ |
+| `AutoPrint.tsx`: define `document.title` antes de `window.print()` → Chrome usa como nome do PDF | ✅ |
+| Exportar Word: ícone baixa `.doc` via `/api/diario/[data]/exportar-doc` | ✅ |
+| Word: HTML MSO com `@page Section1 { margin }` + `div.Section1` — margens corretas no Word | ✅ |
+| Nome do arquivo: `2026-06-16 - Diário Ricardo Luize` (PDF e Word) | ✅ |
+| 3 ícones de export na tela do Diário: Printer / FileText (PDF) / FileDown (Word) | ✅ |
+| Sidebar: entrada "Diário" com ícone `BookOpen` | ✅ |
 
 ### ✅ 4.16 Páginas Públicas
 
@@ -444,6 +481,11 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 | 2026-05-27 | v1.1 | Google Analytics (G-RZNM5FMJ22), link ajuda no sidebar, landing + /como-funciona atualizados |
 | 2026-05-28 | — | Free aiQuota: 20 → 500 (temp, beta). Decisão: manter PWA, não publicar em lojas por ora |
 | 2026-06-07 | v1.2 | Módulo Listas: galeria, checklist, captura por áudio (Whisper+GPT estruturado), cron de lembretes |
+| 2026-06 | v1.3 | Quadro de foco com Kanban drag-and-drop e cronômetro de sessões |
+| 2026-06 | v1.3.1 | Filtros por tipo e ordenação no quadro de foco |
+| 2026-06-16 | v1.4 | Módulo Diário: timeline de registros, sessões de foco, navegação entre dias, impressão |
+| 2026-06-16 | v1.4.1 | Edição inline de registros e bug fix de navegação (`key={dataISO}`) |
+| 2026-06-20 | v1.4.2 | Export PDF (AutoPrint) e Word (HTML MSO) com formatação correta; 3 ícones de export; subtítulo "Diário demandoo" |
 
 ---
 

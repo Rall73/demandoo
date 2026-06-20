@@ -2,7 +2,7 @@
 
 > Leia este arquivo antes de planejar qualquer feature.
 > Para o estado atual e backlog, ver `_docs/PIPELINE.md`.
-> Última atualização: 2026-05-25 (v1.0)
+> Última atualização: 2026-06-20 (v1.4.2)
 
 ---
 
@@ -75,7 +75,7 @@ cron_execucoes
 
 | Campo | Tipo | Descrição |
 |---|---|---|
-| `tipo` | DEMANDA \| TAREFA \| IDEIA | classificado pela IA ou manualmente |
+| `tipo` | DEMANDA \| TAREFA \| IDEIA \| DIARIO | DIARIO é exclusivo do módulo Diário — filtrado de todas as outras views |
 | `relatorioGerado` | LONGTEXT NULL | Relatório IA editável |
 | `relatorioGeradoAt` | DATETIME(3) NULL | Data da última geração |
 | `aiProcessado` | Boolean | true quando IA processou |
@@ -87,9 +87,24 @@ cron_execucoes
 |---|---|---|
 | `conteudo` | TEXT | texto / transcrição |
 | `audioUrl` | VARCHAR(1000) NULL | URL Cloudinary (notas de voz) |
-| `tipo` | VARCHAR(20) | `NOTA` \| `AUDIO` \| `STATUS` |
+| `tipo` | VARCHAR(20) | `NOTA` \| `AUDIO` \| `STATUS` \| `TELEFONEMA` \| `EMAIL` \| `REUNIAO` |
+
+Os tipos `TELEFONEMA`, `EMAIL` e `REUNIAO` são usados exclusivamente no módulo Diário. `STATUS` é auto-log interno (filtrado nas views de Diário).
 
 Toda tabela de domínio tem: `companyId` (isolamento tenant) + `deletedAt`/`deletedBy` (soft delete).
+
+### Tabela `sessoes_foco`
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `id` | INT PK | |
+| `companyId` | INT | isolamento tenant |
+| `userId` | INT | FK users |
+| `demandaId` | INT | FK demandas |
+| `duracaoMin` | INT | minutos da sessão |
+| `iniciadoEm` | DATETIME(3) | timestamp de início (UTC) |
+
+Usada no Quadro de Foco e no módulo Diário (seção "Tempo de foco").
 
 ### Tabelas `listas` + `itens_lista` (v1.2)
 
@@ -177,14 +192,21 @@ demandoo/
 │   │   │   │   ├── nova/              # Captura (voz + texto + manual)
 │   │   │   │   ├── [id]/              # Detalhe + histórico + relatório IA
 │   │   │   │   ├── calendario/
+│   │   │   │   ├── foco/              # Quadro de foco — Kanban drag-and-drop (v1.3)
+│   │   │   │   ├── diario/            # Módulo Diário — timeline + sessões de foco (v1.4)
+│   │   │   │   │   └── DiarioClient.tsx
 │   │   │   │   └── listas/            # Galeria de listas + detalhe com itens
 │   │   │   │       └── [id]/          # ListaDetalhe.tsx — checklist + áudio
 │   │   │   ├── relatorios/            # Seleção + filtros + checkboxes
 │   │   │   ├── configuracoes/         # Perfil, e-mail, senha, plano
 │   │   │   └── equipe/                # Gestão de membros + convites
 │   │   │
-│   │   ├── (print)/                   # Impressão sem Sidebar
-│   │   │   └── relatorios/imprimir/
+│   │   ├── (print)/                   # Impressão sem Sidebar (auth guard ativo)
+│   │   │   ├── relatorios/imprimir/
+│   │   │   └── diario/[data]/imprimir/ # Impressão do Diário (v1.4)
+│   │   │       ├── page.tsx           # Server component — busca dados + renderiza
+│   │   │       ├── PrintButton.tsx    # Botões Imprimir + Word (client)
+│   │   │       └── AutoPrint.tsx      # Auto-dispara window.print() via ?pdf=1 (client)
 │   │   │
 │   │   ├── admin/                     # Restrito a SUPER_ADMIN_EMAIL
 │   │   │   └── empresas/ usuarios/ planos/ consumo/
@@ -197,6 +219,8 @@ demandoo/
 │   │       ├── configuracoes/         # perfil, email, senha
 │   │       ├── cron/lembretes/        # GET (bearer auth) — D-0 e D-1 demandas
 │   │       ├── cron/lembretes-listas/ # GET (bearer auth) — lembrar N dias antes
+│   │       ├── diario/[data]/
+│   │       │   └── exportar-doc/      # GET — gera .doc Word (HTML MSO)
 │   │       ├── listas/                # GET + POST
 │   │       │   └── [id]/
 │   │       │       ├── route.ts       # GET + PATCH + DELETE
@@ -208,7 +232,7 @@ demandoo/
 │   │       │       ├── route.ts       # GET + PATCH (+ auto-log status) + DELETE
 │   │       │       ├── acoes/         # POST + [acaoId] PATCH/DELETE
 │   │       │       ├── calendar.ics/
-│   │       │       ├── comentarios/   # GET + POST + [cId] DELETE
+│   │       │       ├── comentarios/   # GET + POST + [cId] PATCH/DELETE
 │   │       │       └── relatorio/     # POST (gerar IA) + PATCH (salvar)
 │   │       ├── equipe/
 │   │       └── upload/                # audio, avatar
@@ -275,6 +299,9 @@ demandoo/
 | Event handlers em Server Components | Build passa, Passenger crasha em runtime (ERROR 4093732788) |
 | `redirect: false` em Auth.js v5 credentials | É ignorado — erros chegam via `?error=` na URL |
 | Google OAuth sem `passwordHash` | "Esqueci senha" deve chamar `sendDefinePasswordEmail`, não reset |
+| `useState` congelado na navegação SPA | Navegar entre dias no Diário não remonta o componente filho — `entradas` fica frozen. Fix: `key={dataISO}` no pai para forçar remount |
+| `margin` no `body` em HTML exportado para Word | Word não interpreta `body { margin }` como margem de página — usar `@page Section1 { margin }` + `div.Section1` wrapper |
+| Export PDF via link direto | Não existe API de PDF no browser — usar `window.print()` com `document.title` definido antes. Automação via `?pdf=1` + componente `AutoPrint` |
 
 ---
 
@@ -286,7 +313,7 @@ demandoo/
 | Freemium com pool vitalício (não mensal) | Urgência real de conversão |
 | `.ics` em vez de Google Calendar OAuth | Zero dependência, funciona em qualquer cliente |
 | `SUPER_ADMIN_EMAIL` em env var | Único super-admin — coluna no banco seria over-engineering |
-| `(print)` route group | Layout sem sidebar para impressão, mantendo auth guard |
+| `(print)` route group | Layout sem sidebar para impressão, mantendo auth guard. Contém `/relatorios/imprimir` e `/diario/[data]/imprimir` |
 | PWA em vez de app nativo | App Store exige reescrita nativa + 30% sobre receitas iOS |
 | **Asaas como gateway de billing** | BR nativo, Pix + boleto + cartão, recorrência nativa, sem câmbio |
 
