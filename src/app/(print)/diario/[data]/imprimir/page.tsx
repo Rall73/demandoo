@@ -11,17 +11,10 @@ import PrintButton from "./PrintButton"
 type Ctx = { params: Promise<{ data: string }> }
 
 const ENTRADA_LABEL: Record<string, string> = {
-  TELEFONEMA: "Telefonema",
-  EMAIL:      "E-mail",
-  REUNIAO:    "Reunião",
-  NOTA:       "Nota",
-}
-
-const ENTRADA_COR: Record<string, string> = {
-  TELEFONEMA: "text-sky-700    bg-sky-50    border-sky-200",
-  EMAIL:      "text-violet-700 bg-violet-50 border-violet-200",
-  REUNIAO:    "text-emerald-700 bg-emerald-50 border-emerald-200",
-  NOTA:       "text-amber-700  bg-amber-50  border-amber-200",
+  TELEFONEMA: "Telefonemas",
+  EMAIL:      "E-mails",
+  REUNIAO:    "Reuniões",
+  NOTA:       "Notas",
 }
 
 const TIPO_ICON: Record<string, typeof Inbox> = {
@@ -39,7 +32,7 @@ function EntradaIcon({ tipo }: { tipo: string }) {
     TELEFONEMA: Phone, EMAIL: Mail, REUNIAO: Users2, NOTA: PenLine,
   }
   const Icon = icons[tipo] ?? PenLine
-  return <Icon size={13} strokeWidth={2} />
+  return <Icon size={12} strokeWidth={2} />
 }
 
 function formatMin(min: number): string {
@@ -49,8 +42,8 @@ function formatMin(min: number): string {
   return m > 0 ? `${h}h ${m}min` : `${h}h`
 }
 
-function formatHoraBRT(iso: string): string {
-  return new Date(iso).toLocaleTimeString("pt-BR", {
+function formatHoraBRT(d: Date): string {
+  return d.toLocaleTimeString("pt-BR", {
     hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo",
   })
 }
@@ -58,9 +51,10 @@ function formatHoraBRT(iso: string): string {
 export default async function DiarioImprimirPage({ params }: Ctx) {
   const { data: dataParam } = await params
 
-  const session   = await auth()
-  const companyId = session!.user.companyId
-  const userId    = Number(session!.user.id)
+  const session    = await auth()
+  const companyId  = session!.user.companyId
+  const userId     = Number(session!.user.id)
+  const nomeUsuario = session!.user.name ?? ""
 
   const dataISO   = dataParam
   const inicioDia = parseDateBRT(dataISO)
@@ -71,7 +65,6 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
     timeZone: "America/Sao_Paulo",
   }).format(inicioDia)
 
-  // Demanda DIARIO
   const diario = await prisma.demanda.findFirst({
     where: { companyId, userId, tipo: "DIARIO", prazo: { gte: inicioDia, lt: fimDia }, deletedAt: null },
     select: { id: true },
@@ -87,17 +80,18 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
     prisma.acaoDemanda.findMany({
       where: { deletedAt: null, feita: false, prazo: { gte: inicioDia, lt: fimDia },
                demanda: { companyId, userId, deletedAt: null } },
-      select: { id: true, descricao: true, feita: true, demanda: { select: { id: true, titulo: true, tipo: true } } },
+      select: { id: true, descricao: true, feita: true,
+                demanda: { select: { id: true, titulo: true, tipo: true } } },
     }),
     diario
       ? prisma.comentario.findMany({
-          where: { demandaId: diario.id, deletedAt: null, tipo: { notIn: ["STATUS"] } },
+          where:   { demandaId: diario.id, deletedAt: null, tipo: { notIn: ["STATUS"] } },
           orderBy: { createdAt: "asc" },
-          select: { id: true, conteudo: true, tipo: true, createdAt: true },
+          select:  { id: true, conteudo: true, tipo: true, createdAt: true },
         })
       : Promise.resolve([]),
     prisma.sessaoFoco.findMany({
-      where: { companyId, userId, iniciadoEm: { gte: inicioDia, lt: fimDia } },
+      where:   { companyId, userId, iniciadoEm: { gte: inicioDia, lt: fimDia } },
       include: { demanda: { select: { id: true, titulo: true, tipo: true } } },
     }),
   ])
@@ -114,101 +108,123 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
   const totalMin = resumoTempo.reduce((acc, r) => acc + r.totalMin, 0)
 
   return (
-    <div className="print:text-black bg-white min-h-screen p-8 max-w-4xl mx-auto text-sm">
+    <>
+      {/* Estilos de impressão */}
+      <style>{`
+        @page {
+          size: A4;
+          margin: 2cm 2cm 2.5cm 2cm;
+        }
+        @media print {
+          .no-print { display: none !important; }
+          .print-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-top: 1px solid #e2e8f0;
+            font-size: 9pt;
+            color: #94a3b8;
+            background: white;
+          }
+          .page-num::after {
+            content: counter(page);
+          }
+          .pages-total::after {
+            content: counter(pages);
+          }
+        }
+      `}</style>
 
-      {/* Botão de impressão — oculto na impressão */}
-      <div className="print:hidden flex justify-end mb-6">
-        <PrintButton />
-      </div>
+      <div className="bg-white min-h-screen p-10 max-w-2xl mx-auto text-sm text-slate-900">
 
-      {/* Cabeçalho */}
-      <div className="border-b-2 border-slate-900 pb-4 mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 capitalize">{dataFormatada}</h1>
-        <p className="text-slate-500 text-sm mt-1">Diário — demandoo</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-        {/* ── Coluna esquerda: compromissos ─────────────────────────────── */}
-        <div>
-
-          {/* Vence hoje */}
-          {demandasHoje.length > 0 && (
-            <section className="mb-6">
-              <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 border-b border-slate-200 pb-1">
-                <Clock size={11} strokeWidth={2.5} />
-                Vence hoje
-              </h2>
-              <div className="flex flex-col gap-2">
-                {demandasHoje.map((d) => {
-                  const Icon = TIPO_ICON[d.tipo] ?? Inbox
-                  return (
-                    <div key={d.id} className="flex items-start gap-2 py-1.5 border-b border-slate-100 last:border-0">
-                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded shrink-0 mt-0.5 ${TIPO_COR[d.tipo] ?? ""}`}>
-                        <Icon size={10} strokeWidth={2.5} />
-                      </span>
-                      <p className="text-slate-800 leading-snug">{d.titulo}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Ações */}
-          {acoesHoje.length > 0 && (
-            <section className="mb-6">
-              <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 border-b border-slate-200 pb-1">
-                <CheckCircle2 size={11} strokeWidth={2.5} />
-                Ações de hoje
-              </h2>
-              <div className="flex flex-col gap-1.5">
-                {acoesHoje.map((a) => (
-                  <div key={a.id} className="flex items-start gap-2 py-1 border-b border-slate-100 last:border-0">
-                    <span className="w-4 h-4 rounded-full border-2 border-slate-300 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-slate-800 leading-snug">{a.descricao}</p>
-                      <p className="text-xs text-slate-400">{a.demanda.titulo}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Tempo de foco */}
-          {resumoTempo.length > 0 && (
-            <section>
-              <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 border-b border-slate-200 pb-1">
-                <Timer size={11} strokeWidth={2.5} />
-                Tempo de foco — {formatMin(totalMin)}
-              </h2>
-              <div className="flex flex-col gap-1.5">
-                {resumoTempo.map((r) => (
-                  <div key={r.demandaId} className="flex items-center justify-between gap-2 py-1 border-b border-slate-100 last:border-0">
-                    <p className="text-slate-700 truncate">{r.titulo}</p>
-                    <span className="text-xs font-semibold text-slate-600 shrink-0">{formatMin(r.totalMin)}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {demandasHoje.length === 0 && acoesHoje.length === 0 && resumoTempo.length === 0 && (
-            <p className="text-slate-400 italic">Nenhum compromisso registrado.</p>
-          )}
+        {/* Botão imprimir — só na tela */}
+        <div className="no-print flex justify-end mb-6">
+          <PrintButton />
         </div>
 
-        {/* ── Coluna direita: registros agrupados por tipo ─────────────── */}
-        <div>
-          <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 border-b border-slate-200 pb-1">
-            <PenLine size={11} strokeWidth={2.5} />
-            Registros do dia
-          </h2>
+        {/* ── Cabeçalho ─────────────────────────────────────────────────── */}
+        <div className="border-b-2 border-slate-900 pb-4 mb-7">
+          <h1 className="text-2xl font-bold capitalize">{dataFormatada}</h1>
+          <p className="text-slate-500 text-sm mt-1 font-medium">
+            Diário — {nomeUsuario}
+          </p>
+        </div>
 
-          {comentarios.length === 0 ? (
-            <p className="text-slate-400 italic">Nenhum registro.</p>
-          ) : (
+        {/* ── Agenda do dia (Vence hoje) ─────────────────────────────────── */}
+        {demandasHoje.length > 0 && (
+          <section className="mb-6">
+            <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-3">
+              <Clock size={11} strokeWidth={2.5} />
+              Agenda do dia
+            </h2>
+            <div className="flex flex-col">
+              {demandasHoje.map((d) => {
+                const Icon = TIPO_ICON[d.tipo] ?? Inbox
+                return (
+                  <div key={d.id} className="flex items-start gap-2 py-1.5 border-b border-slate-100 last:border-0">
+                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded shrink-0 mt-0.5 ${TIPO_COR[d.tipo] ?? ""}`}>
+                      <Icon size={10} strokeWidth={2.5} />
+                    </span>
+                    <p className="text-slate-800 leading-snug">{d.titulo}</p>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ── Ações de hoje ─────────────────────────────────────────────── */}
+        {acoesHoje.length > 0 && (
+          <section className="mb-6">
+            <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-3">
+              <CheckCircle2 size={11} strokeWidth={2.5} />
+              Ações de hoje
+            </h2>
+            <div className="flex flex-col">
+              {acoesHoje.map((a) => (
+                <div key={a.id} className="flex items-start gap-2 py-1.5 border-b border-slate-100 last:border-0">
+                  <span className="w-4 h-4 rounded-full border-2 border-slate-300 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-slate-800 leading-snug">{a.descricao}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{a.demanda.titulo}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Tempo de foco ─────────────────────────────────────────────── */}
+        {resumoTempo.length > 0 && (
+          <section className="mb-6">
+            <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-3">
+              <Timer size={11} strokeWidth={2.5} />
+              Tempo de foco — {formatMin(totalMin)}
+            </h2>
+            <div className="flex flex-col">
+              {resumoTempo.map((r) => (
+                <div key={r.demandaId} className="flex items-center justify-between gap-4 py-1.5 border-b border-slate-100 last:border-0">
+                  <p className="text-slate-700">{r.titulo}</p>
+                  <span className="text-xs font-semibold text-slate-600 shrink-0">{formatMin(r.totalMin)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Registros do dia (agrupados por tipo) ─────────────────────── */}
+        {comentarios.length > 0 && (
+          <section className="mb-6">
+            <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-4">
+              <PenLine size={11} strokeWidth={2.5} />
+              Registros do dia
+            </h2>
+
             <div className="flex flex-col gap-5">
               {(["TELEFONEMA", "EMAIL", "REUNIAO", "NOTA"] as const).map((tipo) => {
                 const itens = comentarios.filter((c) => c.tipo === tipo)
@@ -223,7 +239,7 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
                       {itens.map((c) => (
                         <div key={c.id} className="flex gap-3 py-1.5 border-b border-slate-100 last:border-0">
                           <span className="text-xs text-slate-400 shrink-0 w-10 pt-0.5">
-                            {formatHoraBRT(c.createdAt.toISOString())}
+                            {formatHoraBRT(c.createdAt)}
                           </span>
                           <p className="text-slate-800 leading-snug whitespace-pre-wrap flex-1">{c.conteudo}</p>
                         </div>
@@ -233,10 +249,24 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
                 )
               })}
             </div>
-          )}
-        </div>
+          </section>
+        )}
+
+        {/* Mensagem vazia */}
+        {demandasHoje.length === 0 && acoesHoje.length === 0 &&
+         resumoTempo.length === 0 && comentarios.length === 0 && (
+          <p className="text-slate-400 italic">Nenhum registro para este dia.</p>
+        )}
+
       </div>
 
-    </div>
+      {/* ── Rodapé — fixo em todas as páginas impressas ─────────────────── */}
+      <div className="print-footer no-print-hide">
+        <span>demandoo</span>
+        <span>
+          Página <span className="page-num" /> de <span className="pages-total" />
+        </span>
+      </div>
+    </>
   )
 }
