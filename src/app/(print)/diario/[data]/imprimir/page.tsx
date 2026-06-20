@@ -199,7 +199,7 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
           )}
         </div>
 
-        {/* ── Coluna direita: timeline ──────────────────────────────────── */}
+        {/* ── Coluna direita: registros agrupados por tipo ─────────────── */}
         <div>
           <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 border-b border-slate-200 pb-1">
             <PenLine size={11} strokeWidth={2.5} />
@@ -209,19 +209,26 @@ export default async function DiarioImprimirPage({ params }: Ctx) {
           {comentarios.length === 0 ? (
             <p className="text-slate-400 italic">Nenhum registro.</p>
           ) : (
-            <div className="flex flex-col gap-3">
-              {comentarios.map((c) => {
-                const cor = ENTRADA_COR[c.tipo] ?? ENTRADA_COR.NOTA
+            <div className="flex flex-col gap-5">
+              {(["TELEFONEMA", "EMAIL", "REUNIAO", "NOTA"] as const).map((tipo) => {
+                const itens = comentarios.filter((c) => c.tipo === tipo)
+                if (itens.length === 0) return null
                 return (
-                  <div key={c.id} className={`border rounded-lg p-3 ${cor}`}>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="flex items-center gap-1 text-xs font-bold">
-                        <EntradaIcon tipo={c.tipo} />
-                        {ENTRADA_LABEL[c.tipo] ?? c.tipo}
-                      </span>
-                      <span className="text-xs opacity-60">{formatHoraBRT(c.createdAt.toISOString())}</span>
+                  <div key={tipo}>
+                    <h3 className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      <EntradaIcon tipo={tipo} />
+                      {ENTRADA_LABEL[tipo]}
+                    </h3>
+                    <div className="flex flex-col">
+                      {itens.map((c) => (
+                        <div key={c.id} className="flex gap-3 py-1.5 border-b border-slate-100 last:border-0">
+                          <span className="text-xs text-slate-400 shrink-0 w-10 pt-0.5">
+                            {formatHoraBRT(c.createdAt.toISOString())}
+                          </span>
+                          <p className="text-slate-800 leading-snug whitespace-pre-wrap flex-1">{c.conteudo}</p>
+                        </div>
+                      ))}
                     </div>
-                    <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">{c.conteudo}</p>
                   </div>
                 )
               })}
