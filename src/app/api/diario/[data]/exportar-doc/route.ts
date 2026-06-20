@@ -150,12 +150,18 @@ export async function GET(_: Request, { params }: Ctx) {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
+  <!--[if gte mso 9]><xml>
+    <w:WordDocument><w:DoNotOptimizeForBrowser/></w:WordDocument>
+  </xml><![endif]-->
   <style>
+    @page Section1 {
+      margin: 2cm 2cm 2cm 2cm;
+    }
+    div.Section1 { page: Section1; }
     body {
       font-family: Arial, Helvetica, sans-serif;
       font-size: 11pt;
       color: #1e293b;
-      margin: 2cm;
     }
     .cabecalho {
       border-bottom: 2px solid #1e293b;
@@ -189,15 +195,17 @@ export async function GET(_: Request, { params }: Ctx) {
   </style>
 </head>
 <body>
-  <div class="cabecalho">
-    <h1>${dataFormatada}</h1>
-    <p class="subtitulo">Di&aacute;rio demandoo &mdash; ${nomeUsuario}</p>
-  </div>
+  <div class="Section1">
+    <div class="cabecalho">
+      <h1>${dataFormatada}</h1>
+      <p class="subtitulo">Di&aacute;rio demandoo &mdash; ${nomeUsuario}</p>
+    </div>
 
-  ${secAgenda}
-  ${secAcoes}
-  ${secTempo}
-  ${secRegistros}
+    ${secAgenda}
+    ${secAcoes}
+    ${secTempo}
+    ${secRegistros}
+  </div>
 </body>
 </html>`
 
