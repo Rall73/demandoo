@@ -7,6 +7,7 @@ import {
   Search, X, CheckCircle2, Clock, PlayCircle, PauseCircle, Ban,
   AlertTriangle, ChevronRight, Inbox, CheckSquare, Lightbulb, Loader2, Sparkles, ArrowUpDown,
 } from "lucide-react"
+import { TagBadge } from "@/components/TagBadge"
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 type Tipo   = "DEMANDA" | "TAREFA" | "IDEIA"
@@ -23,6 +24,7 @@ export interface DemandaItem {
   prazo:           string | null   // ISO string (serializado pelo server)
   solicitanteNome: string | null
   aiProcessado:    boolean
+  tags:            string[]
   acoes:           { id: number; feita: boolean; descricao: string }[]
   createdAt:       string
 }
@@ -99,6 +101,7 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
   const [filtroStatus, setFiltroStatus] = useState<string>("TODOS")
   const [filtroPrio,   setFiltroPrio]   = useState<string>("TODAS")
   const [ordenacao,    setOrdenacao]    = useState<Ordenacao>("PADRAO")
+  const [filtroTag,    setFiltroTag]    = useState<string | null>(null)
   const [toggling,     setToggling]     = useState<number | null>(null)
 
   // Prazo vencido: compara apenas a data (sem hora) para não vencer no próprio dia
@@ -114,12 +117,14 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
     demandas.filter((d) => {
       if (filtroStatus !== "TODOS" && d.status     !== filtroStatus) return false
       if (filtroPrio   !== "TODAS" && d.prioridade !== filtroPrio)   return false
+      if (filtroTag && !d.tags.includes(filtroTag)) return false
       if (busca.trim()) {
         const q = busca.toLowerCase()
         if (
           !d.titulo.toLowerCase().includes(q) &&
           !(d.descricao ?? "").toLowerCase().includes(q) &&
-          !(d.solicitanteNome ?? "").toLowerCase().includes(q)
+          !(d.solicitanteNome ?? "").toLowerCase().includes(q) &&
+          !d.tags.some((t) => t.includes(q))
         ) return false
       }
       return true
@@ -127,13 +132,14 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
     ordenacao
   )
 
-  const temFiltros = !!(busca.trim() || filtroStatus !== "TODOS" || filtroPrio !== "TODAS" || ordenacao !== "PADRAO")
+  const temFiltros = !!(busca.trim() || filtroStatus !== "TODOS" || filtroPrio !== "TODAS" || ordenacao !== "PADRAO" || filtroTag)
 
   function limparFiltros() {
     setBusca("")
     setFiltroStatus("TODOS")
     setFiltroPrio("TODAS")
     setOrdenacao("PADRAO")
+    setFiltroTag(null)
   }
 
   // Toggle TAREFA ABERTA ↔ CONCLUIDA com 1 clique
@@ -224,6 +230,14 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
         )}
       </div>
 
+      {/* Filtro de tag ativo */}
+      {filtroTag && (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span>Filtrando por tag:</span>
+          <TagBadge nome={filtroTag} onRemove={() => setFiltroTag(null)} />
+        </div>
+      )}
+
       {/* Contador */}
       <p className="text-xs text-slate-400">
         {filtradas.length}{" "}
@@ -307,6 +321,13 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
                         ? "⚠ Prazo vencido"
                         : `Prazo: ${new Date(d.prazo!).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`}
                     </p>
+                  )}
+                  {d.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {d.tags.map((t) => (
+                        <TagBadge key={t} nome={t} size="xs" onClick={() => setFiltroTag(t)} />
+                      ))}
+                    </div>
                   )}
                 </Link>
 
@@ -409,6 +430,11 @@ export default function DemandasList({ demandas, tipo }: { demandas: DemandaItem
                           IA
                         </span>
                       )}
+
+                      {/* Tags */}
+                      {d.tags.map((t) => (
+                        <TagBadge key={t} nome={t} size="xs" onClick={() => setFiltroTag(t)} />
+                      ))}
                     </div>
                   </div>
 

@@ -109,6 +109,15 @@ export default async function DiarioImprimirPage({ params, searchParams }: Ctx) 
     .sort((a, b) => b.totalMin - a.totalMin)
   const totalMin = resumoTempo.reduce((acc, r) => acc + r.totalMin, 0)
 
+  // Ciclos de pomodoro (registros automáticos) — consolidados em seção própria
+  const pomodoros = comentarios.filter((c) => c.tipo === "POMODORO")
+  const pomoMin   = pomodoros.reduce((acc, c) => {
+    const m = c.conteudo.match(/(\d+)\s*min/)
+    return acc + (m ? Number(m[1]) : 0)
+  }, 0)
+  const temRegistrosManuais = comentarios.some((c) =>
+    ["TELEFONEMA", "EMAIL", "REUNIAO", "NOTA"].includes(c.tipo))
+
   return (
     <>
       <style>{`
@@ -202,8 +211,26 @@ export default async function DiarioImprimirPage({ params, searchParams }: Ctx) 
           </section>
         )}
 
+        {/* ── Pomodoro (ciclos de foco) ─────────────────────────────────── */}
+        {pomodoros.length > 0 && (
+          <section className="compact mb-6">
+            <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-3">
+              <Timer size={11} strokeWidth={2.5} />
+              Pomodoro — {pomodoros.length} {pomodoros.length === 1 ? "ciclo" : "ciclos"}{pomoMin > 0 ? ` · ${formatMin(pomoMin)}` : ""}
+            </h2>
+            <div className="flex flex-col">
+              {pomodoros.map((c) => (
+                <div key={c.id} className="entry-row flex gap-3 py-1.5 border-b border-slate-100 last:border-0">
+                  <span className="text-xs text-slate-400 shrink-0 w-10 pt-0.5">{formatHoraBRT(c.createdAt)}</span>
+                  <p className="text-slate-800 leading-snug flex-1">{c.conteudo}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* ── Registros do dia ──────────────────────────────────────────── */}
-        {comentarios.length > 0 && (
+        {temRegistrosManuais && (
           <section className="mb-6">
             <h2 className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 pb-1 mb-4">
               <PenLine size={11} strokeWidth={2.5} />

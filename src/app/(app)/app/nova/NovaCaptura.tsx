@@ -8,6 +8,7 @@ import {
   Plus, Trash2, X,
 } from "lucide-react"
 import { useSession } from "next-auth/react"
+import TagInput from "@/components/TagInput"
 
 type Modo = "voz" | "texto" | "manual"
 type Tipo = "DEMANDA" | "TAREFA" | "IDEIA"
@@ -64,6 +65,7 @@ export default function NovaCaptura() {
   const [manualDeleg,    setManualDeleg]    = useState("")
   const [manualAcoes,    setManualAcoes]    = useState<string[]>([])
   const [novaAcao,       setNovaAcao]       = useState("")
+  const [tagsCaptura,    setTagsCaptura]    = useState<string[]>([])
 
   // ── Estado geral ──────────────────────────────────────────────────────────
   const [loading,   setLoading]   = useState(false)
@@ -92,6 +94,7 @@ export default function NovaCaptura() {
     setManualDeleg("")
     setManualAcoes([])
     setNovaAcao("")
+    setTagsCaptura([])
   }
 
   // ── Ações manuais inline ──────────────────────────────────────────────────
@@ -186,8 +189,9 @@ export default function NovaCaptura() {
             solicitanteNome: manualSolic.trim() || null,
             delegadoNome:    manualDeleg.trim() || null,
             acoes:           manualAcoes,
+            tags:            tagsCaptura,
           }
-        : { audioUrl, descricao: descricao.trim() || undefined, tipo }
+        : { audioUrl, descricao: descricao.trim() || undefined, tipo, tags: tagsCaptura }
 
       const res  = await fetch("/api/demandas", {
         method:  "POST",
@@ -355,6 +359,12 @@ export default function NovaCaptura() {
               <Sparkles size={11} />
               A IA extrai título, prioridade, prazo e próximas ações automaticamente.
             </p>
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                Tags <span className="text-slate-400 font-normal">(opcional — a IA também sugere)</span>
+              </label>
+              <TagInput value={tagsCaptura} onChange={setTagsCaptura} placeholder="Ex.: financeiro, cliente joão…" />
+            </div>
           </div>
         )}
 
@@ -518,6 +528,14 @@ export default function NovaCaptura() {
                   <Plus size={14} strokeWidth={2.5} />
                 </button>
               </div>
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                Tags <span className="text-slate-400 font-normal">(opcional)</span>
+              </label>
+              <TagInput value={tagsCaptura} onChange={setTagsCaptura} placeholder="Ex.: financeiro, cliente joão…" />
             </div>
 
           </div>

@@ -6,6 +6,8 @@ import {
   Pencil, Check, X, ChevronDown, Loader2,
   Inbox, CheckSquare, Lightbulb,
 } from "lucide-react"
+import TagInput from "@/components/TagInput"
+import { TagBadge } from "@/components/TagBadge"
 
 type Tipo = "DEMANDA" | "TAREFA" | "IDEIA"
 type Prio = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
@@ -18,6 +20,7 @@ interface Props {
   prioridade:   Prio
   prazo:        string | null  // ISO string ou null
   delegadoNome: string | null
+  tags:         string[]
 }
 
 const TIPO_OPTS = [
@@ -42,7 +45,7 @@ function isoToDate(iso: string | null): string {
 export default function DetalheContent({
   demandaId, tipo: tipoInit, titulo: tituloInit,
   descricao: descInit, prioridade: prioInit, prazo: prazoInit,
-  delegadoNome: delegadoInit,
+  delegadoNome: delegadoInit, tags: tagsInit,
 }: Props) {
   const router = useRouter()
 
@@ -50,6 +53,7 @@ export default function DetalheContent({
   const [tipo,      setTipo]      = useState(tipoInit)
   const [titulo,    setTitulo]    = useState(tituloInit)
   const [descricao, setDescricao] = useState(descInit ?? "")
+  const [tags,      setTags]      = useState<string[]>(tagsInit)
 
   // Modo edição
   const [editTitulo,    setEditTitulo]    = useState(false)
@@ -63,6 +67,7 @@ export default function DetalheContent({
   const [tmpPrio,      setTmpPrio]      = useState<Prio>(prioInit)
   const [tmpPrazo,     setTmpPrazo]     = useState(isoToDate(prazoInit))
   const [tmpDelegado,  setTmpDelegado]  = useState(delegadoInit ?? "")
+  const [tmpTags,      setTmpTags]      = useState<string[]>(tagsInit)
 
   const [loading, setLoading] = useState(false)
 
@@ -113,11 +118,13 @@ export default function DetalheContent({
 
   // ── Detalhes (tipo + prioridade + prazo + delegado) ─────────────────────────
   async function saveDetalhes() {
+    setTags(tmpTags)
     await patch({
       tipo:         tipo,  // tipo já atualizado pelo dropdown ou mantido
       prioridade:   tmpPrio,
       prazo:        tmpPrazo || null,
       delegadoNome: tmpDelegado.trim() || null,
+      tags:         tmpTags,
     })
     setShowDetalhes(false)
   }
@@ -255,6 +262,13 @@ export default function DetalheContent({
         </div>
       )}
 
+      {/* ── Tags (exibição) ──────────────────────────────────────────────────── */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-4">
+          {tags.map((t) => <TagBadge key={t} nome={t} />)}
+        </div>
+      )}
+
       {/* ── Editar detalhes (collapse) ───────────────────────────────────────── */}
       <div className="mt-5 pt-4 border-t border-slate-100">
         <button
@@ -319,6 +333,12 @@ export default function DetalheContent({
                 maxLength={200}
                 className="w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Tags</label>
+              <TagInput value={tmpTags} onChange={setTmpTags} placeholder="Adicionar tags…" />
             </div>
 
             <button

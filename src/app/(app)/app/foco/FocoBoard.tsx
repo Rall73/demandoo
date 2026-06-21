@@ -7,8 +7,9 @@ import {
   Inbox, CheckSquare, Lightbulb,
   Clock, PlayCircle, PauseCircle,
   AlertCircle, ChevronRight, ArrowUpDown,
-  Loader2, X, Check,
+  Loader2, X, Check, Timer,
 } from "lucide-react"
+import { usePomodoro } from "@/components/pomodoro/PomodoroProvider"
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -356,6 +357,7 @@ const ORDENACOES: { valor: Ordenacao; label: string }[] = [
 
 export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco[] }) {
   const router = useRouter()
+  const { start: iniciarPomodoro } = usePomodoro()
 
   const [itens,         setItens]         = useState<DemandaFoco[]>(inicial)
   const [dragId,        setDragId]        = useState<number | null>(null)
@@ -462,8 +464,16 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
             </p>
           </div>
 
-          {/* Ordenação */}
+          {/* Pomodoro + Ordenação */}
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={iniciarPomodoro}
+              title="Iniciar um pomodoro de foco"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors"
+            >
+              <Timer size={14} strokeWidth={2.5} />
+              Pomodoro
+            </button>
             <ArrowUpDown size={14} strokeWidth={2} className="text-slate-400" />
             <select
               value={ordenacao}

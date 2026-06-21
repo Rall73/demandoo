@@ -89,6 +89,13 @@ export async function GET(_: Request, { params }: Ctx) {
     const resumoTempo = Array.from(tempoMap.values()).sort((a, b) => b.totalMin - a.totalMin)
     const totalMin = resumoTempo.reduce((acc, r) => acc + r.totalMin, 0)
 
+    // Ciclos de pomodoro — consolidados em seção própria
+    const pomodoros = comentarios.filter((c) => c.tipo === "POMODORO")
+    const pomoMin   = pomodoros.reduce((acc, c) => {
+      const m = c.conteudo.match(/(\d+)\s*min/)
+      return acc + (m ? Number(m[1]) : 0)
+    }, 0)
+
     // ── Monta seções HTML ────────────────────────────────────────────────
 
     const secAgenda = demandasHoje.length === 0 ? "" : `
@@ -126,8 +133,20 @@ export async function GET(_: Request, { params }: Ctx) {
         `).join("")}
       </table>`
 
+    const secPomodoro = pomodoros.length === 0 ? "" : `
+      <h2>Pomodoro &mdash; ${pomodoros.length} ${pomodoros.length === 1 ? "ciclo" : "ciclos"}${pomoMin > 0 ? ` &middot; ${formatMin(pomoMin)}` : ""}</h2>
+      <table width="100%" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
+        ${pomodoros.map((c) => `
+          <tr style="border-bottom:1px solid #f1f5f9;">
+            <td width="40" valign="top" style="color:#94a3b8;font-size:9pt;white-space:nowrap;">${formatHoraBRT(c.createdAt)}</td>
+            <td style="color:#1e293b;">${c.conteudo.replace(/\n/g, "<br>")}</td>
+          </tr>
+        `).join("")}
+      </table>`
+
     const TIPOS = ["TELEFONEMA", "EMAIL", "REUNIAO", "NOTA"] as const
-    const secRegistros = comentarios.length === 0 ? "" : `
+    const temRegistrosManuais = comentarios.some((c) => (TIPOS as readonly string[]).includes(c.tipo))
+    const secRegistros = !temRegistrosManuais ? "" : `
       <h2>Registros do dia</h2>
       ${TIPOS.map((tipo) => {
         const itens = comentarios.filter((c) => c.tipo === tipo)
@@ -204,6 +223,7 @@ export async function GET(_: Request, { params }: Ctx) {
     ${secAgenda}
     ${secAcoes}
     ${secTempo}
+    ${secPomodoro}
     ${secRegistros}
   </div>
 </body>

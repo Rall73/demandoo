@@ -60,6 +60,7 @@ export default async function DetalhePage({
     where:   { id: Number(id), companyId, userId, deletedAt: null },
     include: {
       acoes:       { where: { deletedAt: null }, orderBy: { ordem: "asc" } },
+      tags:        { include: { tag: true } },
       comentarios: {
         where:   { deletedAt: null },
         orderBy: { createdAt: "asc" },
@@ -166,6 +167,7 @@ export default async function DetalhePage({
         prioridade={demanda.prioridade}
         prazo={demanda.prazo?.toISOString() ?? null}
         delegadoNome={demanda.delegadoNome ?? null}
+        tags={demanda.tags.map((dt) => dt.tag.nome)}
       />
 
       {/* ── Metadados ──────────────────────────────────────────────────────────── */}

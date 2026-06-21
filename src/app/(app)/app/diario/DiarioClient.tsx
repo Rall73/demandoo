@@ -77,6 +77,12 @@ const ENTRADA_CONFIG: Record<EntradaTipo, { label: string; icon: typeof Phone; c
   NOTA:       { label: "Nota",       icon: PenLine, cor: "text-amber-700",   bg: "bg-amber-50  border-amber-200",   pill: "bg-amber-100  text-amber-700" },
 }
 
+// Pomodoro é gravado automaticamente — fica fora do seletor de tipos manuais
+const POMODORO_CFG = {
+  label: "Pomodoro", icon: Timer,
+  cor: "text-rose-700", bg: "bg-rose-50 border-rose-200", pill: "bg-rose-100 text-rose-700",
+}
+
 const TIPO_DEMANDA: Record<string, { icon: typeof Inbox; cor: string }> = {
   DEMANDA: { icon: Inbox,       cor: "bg-violet-100 text-violet-700" },
   TAREFA:  { icon: CheckSquare, cor: "bg-emerald-100 text-emerald-700" },
@@ -487,8 +493,10 @@ export default function DiarioClient({
             )}
 
             {entradas.map((e) => {
-              const tipo      = (e.tipo in ENTRADA_CONFIG ? e.tipo : "NOTA") as EntradaTipo
-              const cfg       = ENTRADA_CONFIG[tipo]
+              const ehPomodoro = e.tipo === "POMODORO"
+              const cfg        = ehPomodoro
+                ? POMODORO_CFG
+                : ENTRADA_CONFIG[(e.tipo in ENTRADA_CONFIG ? e.tipo : "NOTA") as EntradaTipo]
               const Icon      = cfg.icon
               const isPending = e.id < 0
               const isEditing = editandoId === e.id
@@ -548,22 +556,26 @@ export default function DiarioClient({
 
                     {!isPending && !isEditing && (
                       <div className="shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => criarDemanda(e)}
-                          disabled={loadingDem === e.id}
-                          title="Criar demanda a partir deste registro"
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-violet-600 hover:bg-white/60 transition-colors disabled:opacity-50"
-                        >
-                          {loadingDem === e.id ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} strokeWidth={2.5} />}
-                          Demanda
-                        </button>
-                        <button
-                          onClick={() => iniciarEdicao(e)}
-                          title="Editar"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white/60 hover:text-violet-600 transition-colors"
-                        >
-                          <Pencil size={11} strokeWidth={2} />
-                        </button>
+                        {!ehPomodoro && (
+                          <>
+                            <button
+                              onClick={() => criarDemanda(e)}
+                              disabled={loadingDem === e.id}
+                              title="Criar demanda a partir deste registro"
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-violet-600 hover:bg-white/60 transition-colors disabled:opacity-50"
+                            >
+                              {loadingDem === e.id ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} strokeWidth={2.5} />}
+                              Demanda
+                            </button>
+                            <button
+                              onClick={() => iniciarEdicao(e)}
+                              title="Editar"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white/60 hover:text-violet-600 transition-colors"
+                            >
+                              <Pencil size={11} strokeWidth={2} />
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => excluirEntrada(e.id)}
                           disabled={loadingDel === e.id}

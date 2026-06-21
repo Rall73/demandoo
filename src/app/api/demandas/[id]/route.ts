@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { deleteCloudinaryAsset, cloudinaryResourceType } from "@/lib/cloudinary"
+import { sincronizarTags } from "@/lib/tags"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -119,6 +120,11 @@ export async function PATCH(req: Request, { params }: Ctx) {
           tipo:      "STATUS",
         },
       })
+    }
+
+    // Edição de tags (substitui o conjunto atual)
+    if (Array.isArray(body.tags)) {
+      await sincronizarTags(session.user.companyId, Number(id), body.tags, "replace")
     }
 
     return NextResponse.json({ ok: true })

@@ -66,7 +66,10 @@ export default async function AppPage({
     // Lista principal
     prisma.demanda.findMany({
       where:   { ...base, tipo: tipoFiltro },
-      include: { acoes: { orderBy: { ordem: "asc" } } },
+      include: {
+        acoes: { orderBy: { ordem: "asc" } },
+        tags:  { include: { tag: true } },
+      },
       orderBy: [{ status: "asc" }, { prioridade: "asc" }, { createdAt: "desc" }],
       take: 100,
     }),
@@ -120,6 +123,7 @@ export default async function AppPage({
     aiProcessado:    d.aiProcessado,
     createdAt:       d.createdAt.toISOString(),
     acoes:           d.acoes.map((a) => ({ id: a.id, feita: a.feita, descricao: a.descricao })),
+    tags:            d.tags.map((dt) => dt.tag.nome),
   }))
 
   return (

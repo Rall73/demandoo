@@ -46,6 +46,7 @@ model Company {
   anexos      Anexo[]
   listas      Lista[]
   itensList   ItemLista[]
+  tags        Tag[]
 
   @@map("companies")
 }
@@ -185,6 +186,7 @@ model Demanda {
   comentarios Comentario[]
   anexos      Anexo[]
   sessoesFoco SessaoFoco[]
+  tags        DemandaTag[]
 
   @@index([companyId, userId])
   @@index([companyId, tipo])
@@ -253,6 +255,42 @@ model Anexo {
   @@index([demandaId])
   @@index([companyId])
   @@map("anexos")
+}
+
+// ─── Tags ─────────────────────────────────────────────────────────────────────
+
+model Tag {
+  id        Int       @id @default(autoincrement())
+  companyId Int
+  nome      String    @db.VarChar(50)   // normalizado: lowercase, sem '#'
+  cor       String?   @db.VarChar(20)
+  deletedAt DateTime?
+  deletedBy Int?
+  createdAt DateTime  @default(now())
+
+  company  Company      @relation(fields: [companyId], references: [id])
+  demandas DemandaTag[]
+
+  @@unique([companyId, nome])
+  @@index([companyId])
+  @@map("tags")
+}
+
+model DemandaTag {
+  id        Int      @id @default(autoincrement())
+  demandaId Int
+  tagId     Int
+  companyId Int
+  createdAt DateTime @default(now())
+
+  demanda Demanda @relation(fields: [demandaId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([demandaId, tagId])
+  @@index([demandaId])
+  @@index([tagId])
+  @@index([companyId])
+  @@map("demanda_tags")
 }
 
 // ─── Listas ───────────────────────────────────────────────────────────────────

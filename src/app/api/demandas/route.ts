@@ -3,6 +3,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { getOpenAI } from "@/lib/openai"
 import { hojeISOBrasil, diaSemanaHojePT, parseDateBRT } from "@/lib/date"
+import { sincronizarTags, parseTags, normalizarLista } from "@/lib/tags"
 
 export async function GET(req: Request) {
   try {
@@ -12,6 +13,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const tipo      = searchParams.get("tipo") ?? undefined
     const status    = searchParams.get("status") ?? undefined
+    const tag       = searchParams.get("tag") ?? undefined
     const pagina    = Number(searchParams.get("pagina") ?? 1)
     const porPagina = Number(searchParams.get("porPagina") ?? 50)
 
@@ -27,8 +29,12 @@ export async function GET(req: Request) {
           ? { tipo: tipo as "DEMANDA" | "TAREFA" | "IDEIA" }
           : { tipo: { not: "DIARIO" as const } }),
         ...(status ? { status: status as "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA" | "CONCLUIDA" | "CANCELADA" } : {}),
+        ...(tag ? { tags: { some: { tag: { nome: tag, deletedAt: null } } } } : {}),
       },
-      include: { acoes: { orderBy: { ordem: "asc" } } },
+      include: {
+        acoes: { orderBy: { ordem: "asc" } },
+        tags:  { include: { tag: true } },
+      },
       orderBy: [{ prioridade: "asc" }, { createdAt: "desc" }],
       skip:  (pagina - 1) * porPagina,
       take:  porPagina,
@@ -62,6 +68,7 @@ export async function POST(req: Request) {
       delegadoUserId:  delegadoBody,
       delegadoNome:    delegadoNomeBody,
       acoes:           acoesBody,
+      tags:            tagsBody,
     } = body
 
     if (!audioUrl && !descricao && !tituloBody) {
@@ -92,6 +99,7 @@ export async function POST(req: Request) {
       titulo?: string; descricao?: string; tipo?: string
       prioridade?: string; prazo?: string | null
       acoes?: string[]; solicitanteNome?: string | null
+      tags?: string[]
     } = {}
 
     if (usandoIA && !aiBlocked) {
@@ -131,7 +139,7 @@ export async function POST(req: Request) {
                 role: "system",
                 content: `Você é um assistente que estrutura demandas, tarefas e ideias de profissionais.
 Hoje é ${hoje} (${diaSemana}).
-Retorne SOMENTE um JSON com os campos: titulo, descricao, tipo, prioridade, prazo, acoes, solicitanteNome.
+Retorne SOMENTE um JSON com os campos: titulo, descricao, tipo, prioridade, prazo, acoes, solicitanteNome, tags.
 
 CLASSIFICAÇÃO DO TIPO (árvore de decisão — nesta ordem):
 
@@ -147,7 +155,8 @@ REGRAS:
 - prioridade: BAIXA | MEDIA | ALTA | CRITICA (inferir pelo tom e urgência).
 - prazo: YYYY-MM-DD absoluto (resolver datas relativas como "amanhã", "sexta", "semana que vem") ou null.
 - acoes: array de strings com próximas ações concretas (vazio para IDEIA e TAREFA simples).
-- solicitanteNome: nome da pessoa que fez o pedido, ou null.`,
+- solicitanteNome: nome da pessoa que fez o pedido, ou null.
+- tags: array de 2 a 5 etiquetas curtas (1-2 palavras, minúsculas, sem '#') que categorizem assunto, cliente ou área (ex.: "financeiro", "cliente joão", "marketing"). Array vazio se não houver tema claro.`,
               },
               { role: "user", content: textoParaAnalisar },
             ],
@@ -224,6 +233,17 @@ REGRAS:
         where: { id: companyId },
         data:  { aiUsedTotal: { increment: 1 } },
       })
+    }
+
+    // ─── Tags: união de digitadas (body + '#' no texto) com as sugeridas pela IA ──
+    const textoTags  = [tituloBody, descricao, transcricao].filter(Boolean).join(" ")
+    const tagsFinais = normalizarLista([
+      ...(Array.isArray(tagsBody) ? tagsBody : []),
+      ...parseTags(textoTags),
+      ...(aiResult.tags ?? []),
+    ])
+    if (tagsFinais.length > 0) {
+      await sincronizarTags(companyId, demanda.id, tagsFinais, "merge")
     }
 
     return NextResponse.json({ demanda, aiBlocked }, { status: 201 })
