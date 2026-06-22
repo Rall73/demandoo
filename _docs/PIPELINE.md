@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-06-20 (v1.4.2)
+> **Última atualização:** 2026-06-21 (v1.5)
 
 ---
 
@@ -54,7 +54,8 @@ plans
               └── demandas
               │     ├── acoes_demanda
               │     ├── comentarios
-              │     └── anexos
+              │     ├── anexos
+              │     └── demanda_tags ──→ tags
               └── listas
                     └── itens_lista
 accounts / sessions / verification_tokens  (Auth.js)
@@ -122,6 +123,26 @@ CREATE TABLE `comentarios` (
 ALTER TABLE `demandas`
   ADD COLUMN `relatorioGerado`   LONGTEXT    NULL,
   ADD COLUMN `relatorioGeradoAt` DATETIME(3) NULL;
+
+-- v1.5 — sistema de tags (cópia em _docs/sql-tags.sql)
+CREATE TABLE `tags` (
+  `id` INT NOT NULL AUTO_INCREMENT, `companyId` INT NOT NULL,
+  `nome` VARCHAR(50) NOT NULL, `cor` VARCHAR(20) NULL,
+  `deletedAt` DATETIME(3) NULL, `deletedBy` INT NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`), UNIQUE KEY `uq_tags_company_nome` (`companyId`,`nome`),
+  INDEX `idx_tags_company` (`companyId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `demanda_tags` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `demandaId` INT NOT NULL, `tagId` INT NOT NULL, `companyId` INT NOT NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`), UNIQUE KEY `uq_demanda_tag` (`demandaId`,`tagId`),
+  INDEX `idx_dtags_demanda` (`demandaId`), INDEX `idx_dtags_tag` (`tagId`), INDEX `idx_dtags_company` (`companyId`),
+  CONSTRAINT `fk_dtags_demanda` FOREIGN KEY (`demandaId`) REFERENCES `demandas`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dtags_tag`     FOREIGN KEY (`tagId`)     REFERENCES `tags`(`id`)     ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 ---
@@ -251,6 +272,8 @@ ALTER TABLE `demandas`
 | `/api/demandas/[id]/comentarios` | GET, POST | ✅ |
 | `/api/demandas/[id]/comentarios/[cId]` | PATCH (editar), DELETE | ✅ |
 | `/api/diario/[data]/exportar-doc` | GET (gera `.doc` Word) | ✅ |
+| `/api/diario/pomodoro` | POST (registra ciclo de foco no Diário) | ✅ |
+| `/api/tags` | GET (autocomplete de tags da empresa) | ✅ |
 | `/api/demandas/[id]/relatorio` | POST (gerar IA), PATCH (salvar edição) | ✅ |
 | `/api/upload/audio` | POST | ✅ |
 | `/api/upload/avatar` | POST | ✅ |
@@ -357,6 +380,30 @@ ALTER TABLE `demandas`
 | 3 ícones de export na tela do Diário: Printer / FileText (PDF) / FileDown (Word) | ✅ |
 | Sidebar: entrada "Diário" com ícone `BookOpen` | ✅ |
 
+### ✅ 4.21 Pomodoro global (v1.5)
+
+| Item | Status |
+|---|---|
+| Widget global flutuante (Context no layout autenticado) — segue rodando entre telas | ✅ |
+| Botão "Pomodoro" na tela de Foco (ícone `Timer`) | ✅ |
+| Cálculo por timestamp (sem drift em aba de fundo); estado/config em localStorage | ✅ |
+| Config editável: tempo de foco, tempo de pausa, som, notificação | ✅ |
+| Fim de fase: modal + som (Web Audio) + Notification API opcional; FOCO→PAUSA automático | ✅ |
+| Ciclo concluído registra no Diário (`POST /api/diario/pomodoro`, comentário tipo POMODORO) | ✅ |
+| Timeline do Diário exibe o ciclo; impressão e Word consolidam em seção "Pomodoro" | ✅ |
+
+### ✅ 4.22 Tags (v1.5)
+
+| Item | Status |
+|---|---|
+| Modelos `Tag` + `DemandaTag` por empresa (unique companyId+nome, soft delete na tag) | ✅ |
+| `src/lib/tags.ts`: parse de `#`, normalização, sincronização (merge na criação / replace na edição) | ✅ |
+| Captura: campo de chips com autocomplete (Manual + Texto); `#` no texto também vira tag | ✅ |
+| Pipeline de IA sugere tags (campo `tags` no JSON do GPT) | ✅ |
+| `GET /api/tags` — autocomplete por empresa com contagem de uso | ✅ |
+| Detalhe: exibe e edita tags (PATCH substitui o conjunto) | ✅ |
+| Lista: chips nos cards + filtro por tag (clique no chip ou busca textual) | ✅ |
+
 ### ✅ 4.16 Páginas Públicas
 
 | Página | Status |
@@ -434,7 +481,8 @@ npx tsc --noEmit && npx next build
 | Paginação nas listagens (hoje limit 100/200) | 🟡 |
 | Export CSV da lista com filtros aplicados | 🟡 |
 | Drag & drop para reordenar ações | 🟢 |
-| Busca global (Ctrl+K) | 🟢 |
+| Busca global (Ctrl+K) — incluir filtro por tag server-side | 🟢 |
+| Seletor de tags dedicado na barra de filtros da lista (hoje: clique no chip ou busca) | 🟢 |
 
 ### 🔲 6.5 Indicador Pessoal / Trabalho (em avaliação)
 
@@ -486,6 +534,7 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 | 2026-06-16 | v1.4 | Módulo Diário: timeline de registros, sessões de foco, navegação entre dias, impressão |
 | 2026-06-16 | v1.4.1 | Edição inline de registros e bug fix de navegação (`key={dataISO}`) |
 | 2026-06-20 | v1.4.2 | Export PDF (AutoPrint) e Word (HTML MSO) com formatação correta; 3 ícones de export; subtítulo "Diário demandoo" |
+| 2026-06-21 | v1.5 | Pomodoro global (widget flutuante) com registro de ciclos no Diário; sistema de Tags (relacional, IA sugere, autocomplete, filtro na lista) |
 
 ---
 

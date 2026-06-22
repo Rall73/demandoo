@@ -2,7 +2,7 @@
 
 > Leia este arquivo antes de planejar qualquer feature.
 > Para o estado atual e backlog, ver `_docs/PIPELINE.md`.
-> Última atualização: 2026-06-20 (v1.4.2)
+> Última atualização: 2026-06-21 (v1.5)
 
 ---
 
@@ -64,7 +64,8 @@ plans
               └── demandas
               │     ├── acoes_demanda
               │     ├── comentarios
-              │     └── anexos
+              │     ├── anexos
+              │     └── demanda_tags ──→ tags
               └── listas
                     └── itens_lista
 accounts / sessions / verification_tokens  (Auth.js)
@@ -87,9 +88,9 @@ cron_execucoes
 |---|---|---|
 | `conteudo` | TEXT | texto / transcrição |
 | `audioUrl` | VARCHAR(1000) NULL | URL Cloudinary (notas de voz) |
-| `tipo` | VARCHAR(20) | `NOTA` \| `AUDIO` \| `STATUS` \| `TELEFONEMA` \| `EMAIL` \| `REUNIAO` |
+| `tipo` | VARCHAR(20) | `NOTA` \| `AUDIO` \| `STATUS` \| `TELEFONEMA` \| `EMAIL` \| `REUNIAO` \| `POMODORO` |
 
-Os tipos `TELEFONEMA`, `EMAIL` e `REUNIAO` são usados exclusivamente no módulo Diário. `STATUS` é auto-log interno (filtrado nas views de Diário).
+Os tipos `TELEFONEMA`, `EMAIL` e `REUNIAO` são usados exclusivamente no módulo Diário. `STATUS` é auto-log interno (filtrado nas views de Diário). `POMODORO` é gerado ao concluir um ciclo de foco — aparece na timeline do Diário; na impressão/Word é consolidado em seção própria (fora do "Tempo de foco").
 
 Toda tabela de domínio tem: `companyId` (isolamento tenant) + `deletedAt`/`deletedBy` (soft delete).
 
@@ -126,6 +127,28 @@ Usada no Quadro de Foco e no módulo Diário (seção "Tempo de foco").
 | `lembrarAntesDias` | INT NULL | aciona e-mail N dias antes do vencimento |
 | `lembreteEnviadoAt` | DATETIME(3) NULL | controle do cron; null em recorrentes após envio |
 | `url` | VARCHAR(1000) NULL | link externo (usado em COMPRAS) |
+
+### Tabelas `tags` + `demanda_tags` (v1.5)
+
+**`tags`** — etiquetas por empresa (autocomplete, contagem, filtro)
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `companyId` | INT | isolamento tenant |
+| `nome` | VARCHAR(50) | normalizado: lowercase, sem `#` |
+| `cor` | VARCHAR(20) NULL | reservado p/ uso futuro |
+
+`@@unique([companyId, nome])` impede duplicar tag na empresa e vazamento entre tenants. Soft delete (`deletedAt`/`deletedBy`).
+
+**`demanda_tags`** — junção N:N entre `demandas` e `tags`
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `demandaId` | INT | FK demandas (ON DELETE CASCADE) |
+| `tagId` | INT | FK tags (ON DELETE CASCADE) |
+| `companyId` | INT | isolamento tenant |
+
+Tabela associativa: **hard delete** ao desassociar; `@@unique([demandaId, tagId])`. Sincronização em `src/lib/tags.ts` (`merge` na criação, `replace` na edição).
 
 ### Planos atuais
 
@@ -219,8 +242,10 @@ demandoo/
 │   │       ├── configuracoes/         # perfil, email, senha
 │   │       ├── cron/lembretes/        # GET (bearer auth) — D-0 e D-1 demandas
 │   │       ├── cron/lembretes-listas/ # GET (bearer auth) — lembrar N dias antes
-│   │       ├── diario/[data]/
-│   │       │   └── exportar-doc/      # GET — gera .doc Word (HTML MSO)
+│   │       ├── diario/
+│   │       │   ├── [data]/exportar-doc/ # GET — gera .doc Word (HTML MSO)
+│   │       │   └── pomodoro/           # POST — registra ciclo de foco no Diário do dia
+│   │       ├── tags/                   # GET — autocomplete de tags da empresa
 │   │       ├── listas/                # GET + POST
 │   │       │   └── [id]/
 │   │       │       ├── route.ts       # GET + PATCH + DELETE
@@ -238,12 +263,14 @@ demandoo/
 │   │       └── upload/                # audio, avatar
 │   │
 │   ├── auth/                          # NextAuth config + types
-│   ├── components/                    # Sidebar, Providers
+│   ├── components/                    # Sidebar, Providers, TagInput, TagBadge
+│   │   └── pomodoro/                  # PomodoroProvider (context global) + PomodoroWidget (flutuante)
 │   └── lib/
 │       ├── prisma.ts                  # Singleton
 │       ├── date.ts                    # Helpers BRT
 │       ├── openai.ts                  # Lazy singleton
 │       ├── cloudinary.ts
+│       ├── tags.ts                    # parse de #, normalização, sincronização de tags
 │       └── email.ts                   # Nodemailer + templates
 ```
 
@@ -253,7 +280,7 @@ demandoo/
 
 1. Verifica quota (`aiUsedTotal >= aiQuota` → bloqueado)
 2. Se áudio → Whisper-1 transcreve
-3. GPT-4o-mini retorna JSON: `{ titulo, descricao, tipo, prioridade, prazo, acoes, solicitanteNome }`
+3. GPT-4o-mini retorna JSON: `{ titulo, descricao, tipo, prioridade, prazo, acoes, solicitanteNome, tags }`
 4. Prazo: GPT resolve relativos → `YYYY-MM-DD` → `parseDateBRT()` (meia-noite BRT = `T03:00:00Z`)
 5. Solicitante: match por primeiro nome nos `users` da empresa
 6. Body do usuário **sempre** prevalece sobre a IA
@@ -302,6 +329,8 @@ demandoo/
 | `useState` congelado na navegação SPA | Navegar entre dias no Diário não remonta o componente filho — `entradas` fica frozen. Fix: `key={dataISO}` no pai para forçar remount |
 | `margin` no `body` em HTML exportado para Word | Word não interpreta `body { margin }` como margem de página — usar `@page Section1 { margin }` + `div.Section1` wrapper |
 | Export PDF via link direto | Não existe API de PDF no browser — usar `window.print()` com `document.title` definido antes. Automação via `?pdf=1` + componente `AutoPrint` |
+| Input de chips perde texto não confirmado | Tag digitada sem Enter/vírgula se perdia ao submeter — `TagInput` confirma a tag pendente no `onBlur`; sugestão usa `onMouseDown`+`preventDefault` p/ não duplicar |
+| Timer JS desacelera em aba de fundo | Pomodoro conta por **timestamp** (`Date.now() - inicio`), nunca somando ticks de `setInterval` |
 
 ---
 
@@ -316,6 +345,9 @@ demandoo/
 | `(print)` route group | Layout sem sidebar para impressão, mantendo auth guard. Contém `/relatorios/imprimir` e `/diario/[data]/imprimir` |
 | PWA em vez de app nativo | App Store exige reescrita nativa + 30% sobre receitas iOS |
 | **Asaas como gateway de billing** | BR nativo, Pix + boleto + cartão, recorrência nativa, sem câmbio |
+| Pomodoro como widget global (não por demanda) | Foco "livre" que segue entre telas; estado no client (localStorage), zero schema |
+| Ciclo de pomodoro na timeline do Diário (não em `sessoes_foco`) | Não inflar o "Tempo de foco" das demandas; no documento impresso vira seção "Pomodoro" |
+| Tags relacionais (`tags` + `demanda_tags`) | Autocomplete, contagem e isolamento por empresa; IA sugere tags no pipeline |
 
 ---
 
