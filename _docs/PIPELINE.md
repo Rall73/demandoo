@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-06-21 (v1.5)
+> **Última atualização:** 2026-06-21 (v1.5.1)
 
 ---
 
@@ -273,6 +273,7 @@ CREATE TABLE `demanda_tags` (
 | `/api/demandas/[id]/comentarios/[cId]` | PATCH (editar), DELETE | ✅ |
 | `/api/diario/[data]/exportar-doc` | GET (gera `.doc` Word) | ✅ |
 | `/api/diario/pomodoro` | POST (registra ciclo de foco no Diário) | ✅ |
+| `/api/sessoes-foco` | POST + [id] PATCH/DELETE (editar tempo de foco) | ✅ |
 | `/api/tags` | GET (autocomplete de tags da empresa) | ✅ |
 | `/api/demandas/[id]/relatorio` | POST (gerar IA), PATCH (salvar edição) | ✅ |
 | `/api/upload/audio` | POST | ✅ |
@@ -403,6 +404,18 @@ CREATE TABLE `demanda_tags` (
 | `GET /api/tags` — autocomplete por empresa com contagem de uso | ✅ |
 | Detalhe: exibe e edita tags (PATCH substitui o conjunto) | ✅ |
 | Lista: chips nos cards + filtro por tag (clique no chip ou busca textual) | ✅ |
+
+### ✅ 4.23 Edição de tempo de foco (v1.5.1)
+
+| Item | Status |
+|---|---|
+| Painel "Tempo de foco" do Diário editável: expandir por demanda → sessões individuais | ✅ |
+| Editar início/término de uma sessão (recalcula duração) | ✅ |
+| Registrar sessão manual (seletor de demanda + início + término) | ✅ |
+| Excluir sessão (hard delete — registro de tempo) | ✅ |
+| Endpoints `/api/sessoes-foco` (POST) e `/[id]` (PATCH, DELETE) | ✅ |
+| Helpers de fuso `parseDateTimeBRT`/`toDateTimeLocalBRT` para `datetime-local` | ✅ |
+| Quadro de Foco: aviso ao encerrar sessão > 6h (confirmar ou ajustar término, sem bloquear) | ✅ |
 
 ### ✅ 4.16 Páginas Públicas
 
@@ -535,6 +548,7 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 | 2026-06-16 | v1.4.1 | Edição inline de registros e bug fix de navegação (`key={dataISO}`) |
 | 2026-06-20 | v1.4.2 | Export PDF (AutoPrint) e Word (HTML MSO) com formatação correta; 3 ícones de export; subtítulo "Diário demandoo" |
 | 2026-06-21 | v1.5 | Pomodoro global (widget flutuante) com registro de ciclos no Diário; sistema de Tags (relacional, IA sugere, autocomplete, filtro na lista) |
+| 2026-06-21 | v1.5.1 | Edição de tempo de foco no Diário (editar/adicionar/excluir sessões via `/api/sessoes-foco`); aviso de sessão longa (>6h) no Quadro de Foco; hardening de dependências (nodemailer 9, TLS estrito) |
 
 ---
 

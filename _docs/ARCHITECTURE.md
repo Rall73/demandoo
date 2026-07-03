@@ -2,7 +2,7 @@
 
 > Leia este arquivo antes de planejar qualquer feature.
 > Para o estado atual e backlog, ver `_docs/PIPELINE.md`.
-> Última atualização: 2026-06-21 (v1.5)
+> Última atualização: 2026-06-21 (v1.5.1)
 
 ---
 
@@ -102,10 +102,11 @@ Toda tabela de domínio tem: `companyId` (isolamento tenant) + `deletedAt`/`dele
 | `companyId` | INT | isolamento tenant |
 | `userId` | INT | FK users |
 | `demandaId` | INT | FK demandas |
-| `duracaoMin` | INT | minutos da sessão |
+| `duracaoMin` | INT | minutos da sessão (derivado de início/término) |
 | `iniciadoEm` | DATETIME(3) | timestamp de início (UTC) |
+| `encerradoEm` | DATETIME(3) | timestamp de término (UTC) |
 
-Usada no Quadro de Foco e no módulo Diário (seção "Tempo de foco").
+Criada automaticamente ao tirar um item do foco. Desde **v1.5.1** é **editável** no Diário via `/api/sessoes-foco` (editar início/término, adicionar sessão manual, excluir — hard delete, por ser registro de tempo). Ao encerrar uma sessão > 6h, o Quadro de Foco pede confirmação/ajuste do término (`focoEncerradoEm` no PATCH de demanda) — é aviso, não bloqueio.
 
 ### Tabelas `listas` + `itens_lista` (v1.2)
 
@@ -254,11 +255,12 @@ demandoo/
 │   │       ├── demandas/
 │   │       │   ├── route.ts           # GET + POST (pipeline IA)
 │   │       │   └── [id]/
-│   │       │       ├── route.ts       # GET + PATCH (+ auto-log status) + DELETE
+│   │       │       ├── route.ts       # GET + PATCH (+ auto-log status, focoEncerradoEm) + DELETE
 │   │       │       ├── acoes/         # POST + [acaoId] PATCH/DELETE
 │   │       │       ├── calendar.ics/
 │   │       │       ├── comentarios/   # GET + POST + [cId] PATCH/DELETE
 │   │       │       └── relatorio/     # POST (gerar IA) + PATCH (salvar)
+│   │       ├── sessoes-foco/          # POST + [id] PATCH/DELETE (editar tempo de foco)
 │   │       ├── equipe/
 │   │       └── upload/                # audio, avatar
 │   │
@@ -267,7 +269,7 @@ demandoo/
 │   │   └── pomodoro/                  # PomodoroProvider (context global) + PomodoroWidget (flutuante)
 │   └── lib/
 │       ├── prisma.ts                  # Singleton
-│       ├── date.ts                    # Helpers BRT
+│       ├── date.ts                    # Helpers BRT (data + datetime BRT↔UTC)
 │       ├── openai.ts                  # Lazy singleton
 │       ├── cloudinary.ts
 │       ├── tags.ts                    # parse de #, normalização, sincronização de tags
@@ -331,6 +333,7 @@ demandoo/
 | Export PDF via link direto | Não existe API de PDF no browser — usar `window.print()` com `document.title` definido antes. Automação via `?pdf=1` + componente `AutoPrint` |
 | Input de chips perde texto não confirmado | Tag digitada sem Enter/vírgula se perdia ao submeter — `TagInput` confirma a tag pendente no `onBlur`; sugestão usa `onMouseDown`+`preventDefault` p/ não duplicar |
 | Timer JS desacelera em aba de fundo | Pomodoro conta por **timestamp** (`Date.now() - inicio`), nunca somando ticks de `setInterval` |
+| `<input type="datetime-local">` e fuso | Retorna string sem timezone — tratar como **BRT** e converter com `parseDateTimeBRT`/`toDateTimeLocalBRT`; nunca `new Date(inputValue)` cru |
 
 ---
 
