@@ -3,6 +3,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { deleteCloudinaryAsset, cloudinaryResourceType } from "@/lib/cloudinary"
 import { sincronizarTags } from "@/lib/tags"
+import { parseDateTimeBRT } from "@/lib/date"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -90,7 +91,14 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
       // registra sessão de foco estruturada ao sair de EM_ANDAMENTO
       if (demandaAtual.status === "EM_ANDAMENTO" && demandaAtual.focoIniciadoEm) {
-        const encerradoEm = new Date()
+        // Término da sessão = agora, salvo ajuste enviado pelo aviso de sessão longa
+        let encerradoEm = new Date()
+        if (body.focoEncerradoEm) {
+          const ajustado = parseDateTimeBRT(String(body.focoEncerradoEm))
+          if (!isNaN(ajustado.getTime()) && ajustado.getTime() > demandaAtual.focoIniciadoEm.getTime()) {
+            encerradoEm = ajustado
+          }
+        }
         const mins = Math.round((encerradoEm.getTime() - demandaAtual.focoIniciadoEm.getTime()) / 60000)
         if (mins > 0) {
           logMsg += ` (sessão de foco: ${mins < 60 ? `${mins}min` : `${Math.floor(mins / 60)}h${mins % 60 > 0 ? ` ${mins % 60}min` : ""}` })`

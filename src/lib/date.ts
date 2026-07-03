@@ -53,3 +53,21 @@ export function parseDateBRT(iso: string): Date {
 export function toDateBRT(d: Date): string {
   return new Date(d.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
+
+/**
+ * Converte "YYYY-MM-DDTHH:mm" (horário BRT, de <input type="datetime-local">)
+ * para Date armazenável no banco (UTC). BRT = UTC-3, então o offset -03:00
+ * é aplicado explicitamente.
+ */
+export function parseDateTimeBRT(local: string): Date {
+  const comSeg = local.length === 16 ? `${local}:00` : local
+  return new Date(`${comSeg}-03:00`)
+}
+
+/**
+ * Converte um Date do banco (UTC) para "YYYY-MM-DDTHH:mm" em BRT,
+ * pronto para preencher um <input type="datetime-local">.
+ */
+export function toDateTimeLocalBRT(d: Date): string {
+  return new Date(d.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 16)
+}

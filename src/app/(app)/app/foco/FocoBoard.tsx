@@ -339,6 +339,56 @@ function MotivoPauseModal({ onConfirm, onCancel }: {
   )
 }
 
+// ── Modal de sessão longa ─────────────────────────────────────────────────────
+
+function LongaSessaoModal({ horas, onConfirm, onCancel }: {
+  horas:     number
+  onConfirm: (terminoLocal: string) => void
+  onCancel:  () => void
+}) {
+  const agoraLocal = new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 16)
+  const [termino, setTermino] = useState(agoraLocal)
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+            <AlertCircle size={18} strokeWidth={2} className="text-amber-600" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-800">Sessão de foco longa</h3>
+            <p className="text-xs text-slate-400">~{Math.round(horas)}h em foco — confirme ou ajuste o término</p>
+          </div>
+        </div>
+        <p className="text-sm text-slate-600 mb-3">
+          Se você trabalhou todo esse tempo, é só confirmar. Se esqueceu de tirar do foco, ajuste o horário de término:
+        </p>
+        <input
+          type="datetime-local"
+          value={termino}
+          onChange={(e) => setTermino(e.target.value)}
+          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-amber-300"
+        />
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl text-sm font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onConfirm(termino)}
+            className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <Check size={15} strokeWidth={2.5} />
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Board principal ───────────────────────────────────────────────────────────
 
 const TIPO_FILTROS: { valor: Tipo | "TODOS"; label: string }[] = [
@@ -364,6 +414,7 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
   const [dragOver,      setDragOver]      = useState<Status | null>(null)
   const [loading,       setLoading]       = useState<number | null>(null)
   const [pendingEspera, setPendingEspera] = useState<{ id: number; de: Status } | null>(null)
+  const [pendingLonga,  setPendingLonga]  = useState<{ id: number; para: Status; horas: number } | null>(null)
   const [filtroTipo,    setFiltroTipo]    = useState<Tipo | "TODOS">("TODOS")
   const [ordenacao,     setOrdenacao]     = useState<Ordenacao>("PADRAO")
 
@@ -389,7 +440,7 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
   }
   function onDragLeave() { setDragOver(null) }
 
-  async function moverPara(id: number, novoStatus: Status, motivo?: string) {
+  async function moverPara(id: number, novoStatus: Status, motivo?: string, focoEncerradoEm?: string) {
     const demanda = itens.find((d) => d.id === id)
     if (!demanda || demanda.status === novoStatus) return
     const deStatus = demanda.status
@@ -412,6 +463,7 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
     try {
       const body: Record<string, unknown> = { status: novoStatus }
       if (novoStatus === "EM_ESPERA" && motivo !== undefined) body.focoMotivoEspera = motivo
+      if (focoEncerradoEm) body.focoEncerradoEm = focoEncerradoEm
       const res = await fetch(`/api/demandas/${id}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -433,6 +485,11 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
     setDragId(null)
     const demanda = itens.find((d) => d.id === id)
     if (!demanda || demanda.status === col) return
+    // Aviso de sessão longa: saindo do foco com mais de 6h acumuladas
+    if (demanda.status === "EM_ANDAMENTO" && demanda.focoIniciadoEm) {
+      const horas = (Date.now() - new Date(demanda.focoIniciadoEm).getTime()) / 3_600_000
+      if (horas > 6) { setPendingLonga({ id, para: col, horas }); return }
+    }
     if (col === "EM_ESPERA") { setPendingEspera({ id, de: demanda.status }); return }
     moverPara(id, col)
   }
@@ -441,6 +498,12 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
     if (!pendingEspera) return
     moverPara(pendingEspera.id, "EM_ESPERA", motivo)
     setPendingEspera(null)
+  }
+
+  function confirmarLonga(terminoLocal: string) {
+    if (!pendingLonga) return
+    moverPara(pendingLonga.id, pendingLonga.para, undefined, terminoLocal)
+    setPendingLonga(null)
   }
 
   const totalVisiveis = itensFiltrados.length
@@ -572,6 +635,14 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
         <MotivoPauseModal
           onConfirm={confirmarEspera}
           onCancel={() => { setPendingEspera(null); setDragId(null) }}
+        />
+      )}
+
+      {pendingLonga && (
+        <LongaSessaoModal
+          horas={pendingLonga.horas}
+          onConfirm={confirmarLonga}
+          onCancel={() => { setPendingLonga(null); setDragId(null) }}
         />
       )}
     </div>

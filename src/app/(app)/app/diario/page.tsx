@@ -87,7 +87,7 @@ export default async function DiarioPage({
   const prevData = diarioAnterior?.prazo ? toDateBRT(diarioAnterior.prazo) : null
 
   // Busca paralela de todos os dados do dia
-  const [demandasHoje, acoesHoje, comentarios, sessoesHoje] = await Promise.all([
+  const [demandasHoje, acoesHoje, comentarios, sessoesHoje, demandasAtivas] = await Promise.all([
     prisma.demanda.findMany({
       where: {
         companyId,
@@ -126,18 +126,24 @@ export default async function DiarioPage({
       where:   { companyId, userId, iniciadoEm: { gte: inicioDia, lt: fimDia } },
       include: { demanda: { select: { id: true, titulo: true, tipo: true } } },
     }),
+
+    prisma.demanda.findMany({
+      where:   { companyId, userId, deletedAt: null, tipo: { not: "DIARIO" } },
+      select:  { id: true, titulo: true, tipo: true },
+      orderBy: { createdAt: "desc" },
+      take:    200,
+    }),
   ])
 
-  // Agrupa sessões por demanda
-  const tempoMap = new Map<number, { titulo: string; tipo: string; totalMin: number }>()
-  for (const s of sessoesHoje) {
-    const existing = tempoMap.get(s.demandaId)
-    if (existing) existing.totalMin += s.duracaoMin
-    else tempoMap.set(s.demandaId, { titulo: s.demanda.titulo, tipo: s.demanda.tipo, totalMin: s.duracaoMin })
-  }
-  const resumoTempo = Array.from(tempoMap.entries())
-    .map(([demandaId, v]) => ({ demandaId, ...v }))
-    .sort((a, b) => b.totalMin - a.totalMin)
+  const sessoesSerializadas = sessoesHoje.map((s) => ({
+    id:            s.id,
+    demandaId:     s.demandaId,
+    demandaTitulo: s.demanda.titulo,
+    demandaTipo:   s.demanda.tipo as string,
+    iniciadoEm:    s.iniciadoEm.toISOString(),
+    encerradoEm:   s.encerradoEm.toISOString(),
+    duracaoMin:    s.duracaoMin,
+  }))
 
   return (
     <DiarioClient
@@ -166,7 +172,8 @@ export default async function DiarioPage({
         tipo:      c.tipo,
         createdAt: c.createdAt.toISOString(),
       }))}
-      resumoTempo={resumoTempo}
+      sessoes={sessoesSerializadas}
+      demandasAtivas={demandasAtivas.map((d) => ({ id: d.id, titulo: d.titulo, tipo: d.tipo as string }))}
     />
   )
 }

@@ -8,9 +8,10 @@ import {
   Phone, Mail, Users2, PenLine,
   Inbox, CheckSquare, Lightbulb,
   Clock, Trash2, Plus, Send, Loader2,
-  AlertCircle, CheckCircle2, Timer,
+  CheckCircle2, Timer,
   Pencil, X, Check,
 } from "lucide-react"
+import TempoFocoPanel, { type SessaoFocoItem, type DemandaAtiva } from "./TempoFocoPanel"
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -38,26 +39,12 @@ export type EntradaDiario = {
   createdAt: string
 }
 
-export type ResumoTempo = {
-  demandaId: number
-  titulo:    string
-  tipo:      string
-  totalMin:  number
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function addDias(iso: string, dias: number): string {
   const d = new Date(iso + "T12:00:00Z")
   d.setUTCDate(d.getUTCDate() + dias)
   return d.toISOString().slice(0, 10)
-}
-
-function formatMin(min: number): string {
-  if (min < 60) return `${min}min`
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return m > 0 ? `${h}h ${m}min` : `${h}h`
 }
 
 function formatHoraBRT(iso: string): string {
@@ -109,7 +96,8 @@ export default function DiarioClient({
   demandasHoje: demandasIniciais,
   acoesHoje:    acoesIniciais,
   comentariosIniciais,
-  resumoTempo,
+  sessoes,
+  demandasAtivas,
 }: {
   dataISO:             string
   dataFormatada:       string
@@ -119,7 +107,8 @@ export default function DiarioClient({
   demandasHoje:        DemandaHoje[]
   acoesHoje:           AcaoHoje[]
   comentariosIniciais: EntradaDiario[]
-  resumoTempo:         ResumoTempo[]
+  sessoes:             SessaoFocoItem[]
+  demandasAtivas:      DemandaAtiva[]
 }) {
   const router      = useRouter()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -140,7 +129,6 @@ export default function DiarioClient({
   const [loadingEdit,  setLoadingEdit]  = useState(false)
 
   const nextData     = addDias(dataISO, 1)
-  const totalMinHoje = resumoTempo.reduce((acc, r) => acc + r.totalMin, 0)
 
   // foca no textarea de edição quando abre
   useEffect(() => { if (editandoId !== null) editRef.current?.focus() }, [editandoId])
@@ -434,40 +422,11 @@ export default function DiarioClient({
             </section>
           )}
 
-          {resumoTempo.length > 0 && (
-            <section className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                <Timer size={12} strokeWidth={2.5} />
-                Tempo de foco hoje
-              </h2>
-              <div className="text-2xl font-bold text-slate-800 mb-3">
-                {formatMin(totalMinHoje)}
-              </div>
-              <div className="flex flex-col gap-2">
-                {resumoTempo.map((r) => {
-                  const pct  = totalMinHoje > 0 ? Math.round((r.totalMin / totalMinHoje) * 100) : 0
-                  const cfg  = TIPO_DEMANDA[r.tipo] ?? TIPO_DEMANDA.DEMANDA
-                  const Icon = cfg.icon
-                  return (
-                    <div key={r.demandaId} className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`inline-flex items-center justify-center w-4 h-4 rounded shrink-0 ${cfg.cor}`}>
-                            <Icon size={9} strokeWidth={2.5} />
-                          </span>
-                          <span className="text-xs text-slate-700 truncate">{r.titulo}</span>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600 shrink-0">{formatMin(r.totalMin)}</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-violet-500 rounded-full" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          )}
+          <TempoFocoPanel
+            sessoesIniciais={sessoes}
+            demandasAtivas={demandasAtivas}
+            dataISO={dataISO}
+          />
         </div>
 
         {/* ── Painel direito: timeline ──────────────────────────────────── */}
@@ -641,13 +600,6 @@ export default function DiarioClient({
           </div>
         </div>
       </div>
-
-      {resumoTempo.length === 0 && (
-        <div className="mt-4 flex items-center gap-2 text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-          <AlertCircle size={13} strokeWidth={2} className="shrink-0" />
-          Nenhuma sessão de foco registrada hoje. Use a aba Foco para rastrear o tempo trabalhado em cada item.
-        </div>
-      )}
     </div>
   )
 }
