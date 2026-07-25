@@ -171,6 +171,10 @@ Tabela associativa: **hard delete** ao desassociar; `@@unique([demandaId, tagId]
 Produção: painel Hostinger → Environment Variables. Local: `.env.local` (gitignored).
 **`.env` só tem placeholders — nunca commitar segredos.**
 
+> 📋 Lista completa das chaves de produção, origem de cada valor e armadilhas:
+> **`_docs/ENV-PRODUCAO.md`**. Leia antes de mexer no painel — em especial o aviso
+> sobre o botão "Importar .env", que substitui todas as variáveis em vez de mesclar.
+
 | Variável | Observação |
 |---|---|
 | `DATABASE_URL` | `mysql://USER:SENHA@srv####.hstgr.io:3306/BANCO` |
