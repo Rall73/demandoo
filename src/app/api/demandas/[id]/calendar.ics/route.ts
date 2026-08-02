@@ -77,7 +77,7 @@ export async function GET(_: Request, { params }: Ctx) {
       `DTEND:${fmtIcsUtc(dtend)}`,
       foldIcs(`SUMMARY:${escapeIcs(demanda.titulo)}`),
       ...(demanda.descricao ? [foldIcs(`DESCRIPTION:${escapeIcs(demanda.descricao)}`)] : []),
-      foldIcs(`URL:https://demandoo.net/app/${demanda.id}`),
+      foldIcs(`URL:https://demandoo.com.br/app/${demanda.id}`),
       "END:VEVENT",
       "END:VCALENDAR",
     ]

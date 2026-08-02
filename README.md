@@ -3,7 +3,7 @@
 > SaaS de captura de demandas, tarefas e ideias com IA.
 > Fale ou digite qualquer coisa — Whisper transcreve e GPT-4o-mini estrutura automaticamente.
 
-🌐 **Produção:** [demandoo.net](https://demandoo.net)
+🌐 **Produção:** [demandoo.com.br](https://demandoo.com.br) — `demandoo.net` redireciona para cá
 
 ---
 

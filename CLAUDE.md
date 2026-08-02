@@ -1,6 +1,6 @@
 @AGENTS.md
 
-## demandoo.net
+## demandoo.com.br
 
 SaaS standalone de captura de demandas, tarefas e ideias com IA.
 Stack: Next.js 16 (App Router) + Prisma + MySQL + Auth.js v5 + OpenAI + Cloudinary

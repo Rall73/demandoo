@@ -240,7 +240,7 @@ export default async function AdminConsumoPage() {
                 </p>
                 <p className="text-xs text-slate-400">
                   Rastreando visualizações de página, eventos e sessões em{" "}
-                  <span className="font-medium text-slate-600">demandoo.net</span>
+                  <span className="font-medium text-slate-600">demandoo.com.br</span>
                 </p>
               </div>
               <a

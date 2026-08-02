@@ -41,7 +41,8 @@
 - **GitHub:** `https://github.com/Rall73/demandoo` (privado)
 - **Branch de produção:** `main` (push = deploy automático)
 - **Pasta local:** `C:\Users\Ricardo\Blog\demandoo`
-- **Domínio:** `https://demandoo.net`
+- **Domínio:** `https://demandoo.com.br` (canônico) — `demandoo.net` redireciona para ele.
+  O `.net` é bloqueado por filtro corporativo em algumas empresas, por isso o `.com.br` é o domínio de uso.
 - **Super-admin:** `rluize@gmail.com` (via `SUPER_ADMIN_EMAIL`)
 
 ---
@@ -51,7 +52,7 @@
 | Ambiente | Banco | URL |
 |---|---|---|
 | **Local** | `u822347350_demandoo_dev` | `localhost:3000` |
-| **Produção** | `u822347350_bd_demandoo` | `demandoo.net` |
+| **Produção** | `u822347350_bd_demandoo` | `demandoo.com.br` |
 
 Hostinger prefixa banco e usuário com `u822347350_`. SQL alterado precisa ser rodado **nos dois bancos** via phpMyAdmin.
 
@@ -179,7 +180,7 @@ Produção: painel Hostinger → Environment Variables. Local: `.env.local` (git
 |---|---|
 | `DATABASE_URL` | `mysql://USER:SENHA@srv####.hstgr.io:3306/BANCO` |
 | `AUTH_SECRET` | Configurado no painel |
-| `NEXTAUTH_URL` | `https://demandoo.net` (prod) / `http://localhost:3000` (dev) |
+| `NEXTAUTH_URL` | `https://demandoo.com.br` (prod) / `http://localhost:3000` (dev) — **nunca o `.net`**, ver `ENV-PRODUCAO.md` |
 | `NEXT_PUBLIC_APP_URL` | Igual ao acima |
 | `OPENAI_API_KEY` | Conta OpenAI do Ricardo |
 | `CLOUDINARY_CLOUD_NAME`, `_API_KEY`, `_API_SECRET` | Conta Cloudinary |

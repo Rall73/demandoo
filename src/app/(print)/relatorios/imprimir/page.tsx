@@ -275,7 +275,7 @@ export default async function ImprimirPage({
 
         {/* Rodapé do documento */}
         <div className="mt-12 pt-4 border-t border-slate-200 text-xs text-slate-400 text-center">
-          Gerado em {hoje} · demandoo.net
+          Gerado em {hoje} · demandoo.com.br
         </div>
       </div>
     </div>

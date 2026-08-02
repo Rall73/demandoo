@@ -442,7 +442,7 @@ CREATE TABLE `demanda_tags` (
 | Ambiente | Banco | URL |
 |---|---|---|
 | **Local** | `u822347350_demandoo_dev` | `localhost:3000` |
-| **Produção** | `u822347350_bd_demandoo` | `demandoo.net` |
+| **Produção** | `u822347350_bd_demandoo` | `demandoo.com.br` |
 
 **Variáveis de ambiente:**
 - `.env` → placeholders apenas (commitado, sem segredos)

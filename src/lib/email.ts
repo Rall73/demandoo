@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer"
 
 const FROM    = process.env.EMAIL_FROM    ?? "demandoo <noreply@demandoo.net>"
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://demandoo.net"
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://demandoo.com.br"
 
 /** Cria um transporter fresco a cada envio, garantindo uso das env vars atuais. */
 function makeTransporter() {
