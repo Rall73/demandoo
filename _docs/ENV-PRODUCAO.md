@@ -35,8 +35,8 @@ lápis para editar. Sempre. Mesmo que sejam 20 chaves.
 |---|---|---|
 | `AUTH_SECRET` | `openssl rand -base64 32` | v5 usa **`AUTH_SECRET`**, não `NEXTAUTH_SECRET`. Trocar o valor derruba todas as sessões ativas — usuários precisam logar de novo |
 | `NEXTAUTH_URL` | fixo | `https://demandoo.com.br` — **nunca o `.net`**, ver seção 3. A chave `NEXTAUTH_URL` **continua válida no v5** (lida como alias de `AUTH_URL`, ver `node_modules/next-auth/lib/env.js`). Só o `NEXTAUTH_SECRET` é que foi aposentado |
-| `GOOGLE_CLIENT_ID` | Google Cloud Console → APIs e Serviços → Credenciais | **Sem cópia no repositório.** Se perder, só se recupera no console da Google |
-| `GOOGLE_CLIENT_SECRET` | idem | Idem. Se o secret não for mais exibido, gerar um novo (invalida o anterior) |
+| `GOOGLE_CLIENT_ID` | Google Cloud Console → Google Auth Platform → Clientes | **Sem cópia no repositório.** Recuperável: fica visível no console |
+| `GOOGLE_CLIENT_SECRET` | **não é recuperável** — ver seção 5 | O Google **não exibe mais** chaves secretas depois de criadas: só mostra os 4 últimos caracteres. Se o valor se perder, a única saída é "Add secret" e gerar uma nova |
 
 ### Aplicação
 
@@ -160,5 +160,18 @@ os **valores** só existem em dois lugares: no painel e no `.env.local` da máqu
 Ricardo — e `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` **não estão nem no `.env.local`**
 (são placeholders lá).
 
-Recomendado: manter uma cópia dos valores de produção num gerenciador de senhas,
-incluindo os dois do Google.
+### ⚠️ O `GOOGLE_CLIENT_SECRET` não tem origem de recuperação
+
+O Google Cloud Console **não exibe mais o valor** de uma chave secreta depois de criada
+— mostra só os 4 últimos caracteres e a data. Não existe "ver" nem "baixar".
+
+Ou seja: o `GOOGLE_CLIENT_SECRET` de produção existe hoje em **um único lugar no mundo**,
+a variável de ambiente do painel Hostinger. Se ela for apagada (como aconteceu em
+2026-08-02), o valor não pode ser recuperado de lugar nenhum — a única saída é gerar uma
+chave nova em Clientes → "Add secret" e substituir no painel.
+
+O `GOOGLE_CLIENT_ID` não tem esse problema: continua visível no console.
+
+**Recomendado, e mais importante para esta chave do que para as outras:** manter uma
+cópia dos valores de produção num gerenciador de senhas. Sem isso, um deslize no painel
+custa uma troca de credencial do OAuth.
