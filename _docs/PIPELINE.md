@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-06-21 (v1.5.1)
+> **Última atualização:** 2026-08-02 (v1.6)
 
 ---
 
@@ -273,6 +273,7 @@ CREATE TABLE `demanda_tags` (
 | `/api/demandas/[id]/comentarios/[cId]` | PATCH (editar), DELETE | ✅ |
 | `/api/diario/[data]/exportar-doc` | GET (gera `.doc` Word) | ✅ |
 | `/api/diario/pomodoro` | POST (registra ciclo de foco no Diário) | ✅ |
+| `/api/resumo/[mes]/exportar-doc` | GET (gera `.doc` Word do fechamento mensal) | ✅ |
 | `/api/sessoes-foco` | POST + [id] PATCH/DELETE (editar tempo de foco) | ✅ |
 | `/api/tags` | GET (autocomplete de tags da empresa) | ✅ |
 | `/api/demandas/[id]/relatorio` | POST (gerar IA), PATCH (salvar edição) | ✅ |
@@ -417,6 +418,33 @@ CREATE TABLE `demanda_tags` (
 | Helpers de fuso `parseDateTimeBRT`/`toDateTimeLocalBRT` para `datetime-local` | ✅ |
 | Quadro de Foco: aviso ao encerrar sessão > 6h (confirmar ou ajustar término, sem bloquear) | ✅ |
 
+### ✅ 4.24 Resumo do mês (v1.6)
+
+Fechamento mensal em `/app/resumo?mes=YYYY-MM`. **Zero mudança de schema** — tudo derivado de
+`createdAt`, `concluidoAt`, `prazo`, `status`, `sessoes_foco`, `comentarios` e `demanda_tags`.
+
+| Item | Status |
+|---|---|
+| Agregação central em `src/lib/resumo-mes.ts` (reusada por tela, impressão e Word) | ✅ |
+| Navegação entre meses com clamp no mês corrente (nunca aceita mês futuro) | ✅ |
+| KPIs: abertas, concluídas, % entregue no prazo, tempo de foco — com variação vs. mês anterior | ✅ |
+| Movimento por tipo (DEMANDA/TAREFA/IDEIA): abertas, concluídas, em aberto, canceladas | ✅ |
+| Prazos que venciam no mês: no prazo / com atraso / vencidos em aberto / a vencer / cancelados | ✅ |
+| Tempo médio entre abertura e conclusão (dias corridos) | ✅ |
+| Tempo de foco do mês: total, nº de sessões, dias ativos, ranking por demanda com barra | ✅ |
+| Ciclos de pomodoro contados à parte do tempo de foco | ✅ |
+| Diário: dias com registro + contagem por tipo (telefonema/e-mail/reunião/nota) | ✅ |
+| Tags mais usadas nos itens abertos no mês (top 12) | ✅ |
+| Lista de concluídas no mês e de vencidas ainda em aberto (links para o detalhe) | ✅ |
+| Impressão `/resumo/[mes]/imprimir` + PDF via `?pdf=1` + Word `.doc` | ✅ |
+| `AutoPrint` promovido a `src/components/AutoPrint.tsx` (compartilhado com o Diário) | ✅ |
+| Sidebar: entrada "Resumo do mês" com ícone `BarChart3` | ✅ |
+
+> ⚠️ **Limite conhecido:** o banco não guarda histórico de status, só o status atual.
+> Por isso "em aberto", "canceladas" e "vencidas" são sempre a **situação de hoje**, nunca uma
+> foto do fim do mês. As métricas de fluxo (abertas / concluídas / entregues no prazo) são exatas,
+> pois derivam de `createdAt` e `concluidoAt`. A UI diz isso explicitamente ao usuário.
+
 ### ✅ 4.16 Páginas Públicas
 
 | Página | Status |
@@ -457,6 +485,72 @@ npx tsc --noEmit && npx next build
 ---
 
 ## 6. Backlog — O Que Ainda Será Criado
+
+### 🔲 6.0 Roadmap aprovado (decidido em 2026-08-02)
+
+Sequência acordada com o Ricardo. Ordem deliberada: do menor risco para o maior,
+para não desestruturar o que já funciona.
+
+#### v1.7 — Prazo nas ações (tarefas internas)
+
+O campo **`acoes_demanda.prazo` já existe no schema** e o Diário **já consulta ações
+com prazo de hoje** (`diario/page.tsx` e a página de impressão). Falta só o caminho de
+escrita — hoje o painel "Ações de hoje" do Diário nunca mostra nada por falta de UI.
+
+| Item | Prioridade |
+|---|---|
+| `POST/PATCH /api/demandas/[id]/acoes` aceitar `prazo` | 🔴 |
+| Input de data por ação no checklist do detalhe | 🔴 |
+| Badge de prazo/atraso na ação; ações com prazo entram no Calendário | 🟡 |
+
+> Sem SQL: a coluna já existe nos dois bancos.
+
+#### v1.8 — Vínculo direto entre demandas
+
+Decisão do Ricardo: **não é agrupar por tag, é vínculo direto** entre itens (continuidade
+e desdobramento), para alimentar relatórios de cadeia no futuro.
+
+| Item | Prioridade |
+|---|---|
+| Tabela `demanda_relacoes` (`companyId`, `demandaOrigemId`, `demandaDestinoId`, `tipo`, `createdAt`) | 🔴 |
+| `tipo`: `CONTINUACAO` \| `DESDOBRAMENTO` \| `RELACIONADA`; unique no par; `ON DELETE CASCADE` | 🔴 |
+| Leitura bidirecional (`OR` nos dois lados) — o vínculo aparece nas duas pontas | 🔴 |
+| UI no detalhe: busca por título (padrão do `TagInput`) + chips das demandas conectadas | 🔴 |
+| Incluir vínculos na impressão e no relatório IA | 🟡 |
+
+#### v1.9 — Delegação em cadeia (desenho aprovado: **demanda-filha**)
+
+Delegar **cria uma demanda nova pertencente ao delegado**, ligada à original.
+Ricardo → Jussara → Daniel gera três demandas encadeadas, cada uma com seu dono.
+
+**Por que este desenho:** hoje *toda* query do app é `where: { companyId, userId }`
+(dashboard, lista, foco, calendário, diário, relatórios, `GET /api/demandas`).
+Visibilidade compartilhada exigiria reescrever 15+ pontos de query, com risco real de
+vazamento entre usuários. Com demanda-filha, **nenhuma query existente muda** — cada um
+continua vendo só o que é seu, e a cadeia suporta N níveis, não só dois.
+
+| Item | Prioridade |
+|---|---|
+| Tabela `delegacoes` (`companyId`, `demandaOrigemId`, `demandaFilhaId`, `delegadoPorUserId`, `delegadoParaUserId`, `prazoRetorno`, `devolutiva`, `respondidoAt`) | 🔴 |
+| Migrar `delegadoNome` (texto livre) → `delegadoUserId` real; seletor de membros da empresa | 🔴 |
+| Painel "Delegação" no detalhe da mãe: status/prazo da filha ao vivo, ações dela, timeline dela, devolutiva, nível seguinte da cadeia | 🔴 |
+| Auto-log na timeline da mãe quando a filha muda de status / é concluída | 🔴 |
+| Foco: abas **Delegadas** (minhas que geraram filha) e **Recebidas** (minhas vindas de alguém) | 🔴 |
+| E-mail "nova demanda delegada" + "demanda concluída" (ver 6.3) | 🟡 |
+| Regra de quem pode delegar para quem | 🟡 |
+| **Não** delegar ação individual — em vez disso, "promover ação a demanda" (vira demanda própria, vinculada via v1.8) e delegar a demanda | 🟡 |
+
+> **Custo aceito do desenho:** título/descrição são copiados na delegação e podem divergir
+> depois; o histórico não é compartilhado (a timeline da filha aparece na mãe, somente leitura).
+
+#### Adiado — demanda diária automática
+
+Avaliado em 2026-08-02 e **adiado a pedido do Ricardo** ("hoje não é necessário, no futuro
+reavalio"). Registro da análise para não refazer:
+o registro `DIARIO` do dia **já é criado automaticamente** em `/app/diario` (prazo = o dia,
+prioridade MEDIA) e já é filtrado de todos os KPIs. Se um dia for retomado, o caminho barato é
+**reusar esse registro** (renomear + tag `diario` + liberar `DIARIO` no Quadro de Foco), e não
+criar demanda nova por cron — esta última polui dashboard e resumo mensal com ~30 itens/mês.
 
 ### 🔲 6.1 Planos e Billing (🔴 Alta — bloqueador de receita)
 
@@ -549,6 +643,7 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 | 2026-06-20 | v1.4.2 | Export PDF (AutoPrint) e Word (HTML MSO) com formatação correta; 3 ícones de export; subtítulo "Diário demandoo" |
 | 2026-06-21 | v1.5 | Pomodoro global (widget flutuante) com registro de ciclos no Diário; sistema de Tags (relacional, IA sugere, autocomplete, filtro na lista) |
 | 2026-06-21 | v1.5.1 | Edição de tempo de foco no Diário (editar/adicionar/excluir sessões via `/api/sessoes-foco`); aviso de sessão longa (>6h) no Quadro de Foco; hardening de dependências (nodemailer 9, TLS estrito) |
+| 2026-08-02 | v1.6 | Resumo do mês: fechamento mensal em `/app/resumo` com movimento por tipo, prazos, tempo de foco, Diário, tags e comparativo com o mês anterior; impressão, PDF e Word. Sem mudança de schema |
 
 ---
 

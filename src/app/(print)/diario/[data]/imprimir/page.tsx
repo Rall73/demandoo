@@ -7,7 +7,7 @@ import {
   Clock, CheckCircle2, Timer,
 } from "lucide-react"
 import PrintButton from "./PrintButton"
-import AutoPrint   from "./AutoPrint"
+import AutoPrint   from "@/components/AutoPrint"
 
 type Ctx = { params: Promise<{ data: string }>; searchParams: Promise<{ pdf?: string }> }
 

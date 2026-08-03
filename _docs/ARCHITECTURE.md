@@ -2,7 +2,7 @@
 
 > Leia este arquivo antes de planejar qualquer feature.
 > Para o estado atual e backlog, ver `_docs/PIPELINE.md`.
-> Última atualização: 2026-06-21 (v1.5.1)
+> Última atualização: 2026-08-02 (v1.6)
 
 ---
 
@@ -224,6 +224,7 @@ demandoo/
 │   │   │   │   ├── foco/              # Quadro de foco — Kanban drag-and-drop (v1.3)
 │   │   │   │   ├── diario/            # Módulo Diário — timeline + sessões de foco (v1.4)
 │   │   │   │   │   └── DiarioClient.tsx
+│   │   │   │   ├── resumo/            # Resumo do mês — fechamento mensal (v1.6)
 │   │   │   │   └── listas/            # Galeria de listas + detalhe com itens
 │   │   │   │       └── [id]/          # ListaDetalhe.tsx — checklist + áudio
 │   │   │   ├── relatorios/            # Seleção + filtros + checkboxes
@@ -232,10 +233,10 @@ demandoo/
 │   │   │
 │   │   ├── (print)/                   # Impressão sem Sidebar (auth guard ativo)
 │   │   │   ├── relatorios/imprimir/
+│   │   │   ├── resumo/[mes]/imprimir/ # Impressão do Resumo do mês (v1.6)
 │   │   │   └── diario/[data]/imprimir/ # Impressão do Diário (v1.4)
 │   │   │       ├── page.tsx           # Server component — busca dados + renderiza
-│   │   │       ├── PrintButton.tsx    # Botões Imprimir + Word (client)
-│   │   │       └── AutoPrint.tsx      # Auto-dispara window.print() via ?pdf=1 (client)
+│   │   │       └── PrintButton.tsx    # Botões Imprimir + Word (client)
 │   │   │
 │   │   ├── admin/                     # Restrito a SUPER_ADMIN_EMAIL
 │   │   │   └── empresas/ usuarios/ planos/ consumo/
@@ -271,10 +272,12 @@ demandoo/
 │   │
 │   ├── auth/                          # NextAuth config + types
 │   ├── components/                    # Sidebar, Providers, TagInput, TagBadge
+│   │   ├── AutoPrint.tsx              # Auto-dispara window.print() via ?pdf=1 (Diário + Resumo)
 │   │   └── pomodoro/                  # PomodoroProvider (context global) + PomodoroWidget (flutuante)
 │   └── lib/
 │       ├── prisma.ts                  # Singleton
-│       ├── date.ts                    # Helpers BRT (data + datetime BRT↔UTC)
+│       ├── date.ts                    # Helpers BRT (data + datetime + mês BRT↔UTC)
+│       ├── resumo-mes.ts              # Agregações do fechamento mensal (tela + print + Word)
 │       ├── openai.ts                  # Lazy singleton
 │       ├── cloudinary.ts
 │       ├── tags.ts                    # parse de #, normalização, sincronização de tags
