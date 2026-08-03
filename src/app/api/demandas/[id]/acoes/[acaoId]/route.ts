@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { parseDataOpcionalBRT } from "@/lib/date"
 
 type Ctx = { params: Promise<{ id: string; acaoId: string }> }
 
@@ -31,6 +32,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
     const campos: Record<string, unknown> = {}
     if (body.descricao !== undefined) campos.descricao = body.descricao.trim().slice(0, 1000)
     if (body.feita     !== undefined) campos.feita     = Boolean(body.feita)
+    // prazo: string YYYY-MM-DD define; null/"" limpa
+    if (body.prazo     !== undefined) campos.prazo     = parseDataOpcionalBRT(body.prazo)
 
     await prisma.acaoDemanda.update({ where: { id: Number(acaoId) }, data: campos })
 

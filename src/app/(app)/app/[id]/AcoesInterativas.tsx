@@ -2,28 +2,45 @@
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Loader2, Pencil, Trash2, Check, X } from "lucide-react"
+import { Plus, Loader2, Pencil, Trash2, Check, X, CalendarPlus, CalendarClock } from "lucide-react"
 
 interface Acao {
   id:        number
   descricao: string
   feita:     boolean
+  prazo:     string | null   // ISO vindo do servidor
 }
 
 interface Props {
   demandaId: number
   acoes:     Acao[]
+  /** YYYY-MM-DD de hoje em BRT — calculado no servidor, nunca com new Date() no client */
+  hojeISO:   string
 }
 
-export default function AcoesInterativas({ demandaId, acoes: acoesInit }: Props) {
+/** ISO do banco → "YYYY-MM-DD" em BRT, pronto para <input type="date">. */
+function isoParaData(iso: string | null): string {
+  if (!iso) return ""
+  return new Date(new Date(iso).getTime() - 3 * 3600_000).toISOString().slice(0, 10)
+}
+
+/** "2026-08-05" → "05/08" */
+function dataCurta(dataISO: string): string {
+  const [, mes, dia] = dataISO.split("-")
+  return `${dia}/${mes}`
+}
+
+export default function AcoesInterativas({ demandaId, acoes: acoesInit, hojeISO }: Props) {
   const router = useRouter()
 
   // Estado local (otimista)
   const [acoes,       setAcoes]       = useState<Acao[]>(acoesInit)
   const [novaDesc,    setNovaDesc]    = useState("")
+  const [novoPrazo,   setNovoPrazo]   = useState("")
   const [addindo,     setAddindo]     = useState(false)
   const [editandoId,  setEditandoId]  = useState<number | null>(null)
   const [tmpDesc,     setTmpDesc]     = useState("")
+  const [prazoAbertoId, setPrazoAbertoId] = useState<number | null>(null)
   const [loadingId,   setLoadingId]   = useState<number | null>(null)
   const [salvandoNova, setSalvandoNova] = useState(false)
   const inputNovaRef = useRef<HTMLInputElement>(null)
@@ -73,6 +90,23 @@ export default function AcoesInterativas({ demandaId, acoes: acoesInit }: Props)
     setTmpDesc("")
   }
 
+  // ── Prazo da ação ─────────────────────────────────────────────────────────────
+  async function salvarPrazo(id: number, dataISO: string) {
+    const prazo = dataISO || null
+    // Otimista: guarda como meia-noite BRT, mesmo formato que o servidor devolve
+    setAcoes((prev) => prev.map((a) =>
+      a.id === id ? { ...a, prazo: prazo ? `${prazo}T03:00:00.000Z` : null } : a))
+    setPrazoAbertoId(null)
+    setLoadingId(id)
+    await fetch(`/api/demandas/${demandaId}/acoes/${id}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ prazo }),
+    })
+    router.refresh()
+    setLoadingId(null)
+  }
+
   // ── Excluir ───────────────────────────────────────────────────────────────────
   async function excluir(id: number) {
     setAcoes((prev) => prev.filter((a) => a.id !== id))
@@ -83,19 +117,24 @@ export default function AcoesInterativas({ demandaId, acoes: acoesInit }: Props)
   // ── Adicionar nova ────────────────────────────────────────────────────────────
   async function adicionarAcao() {
     if (!novaDesc.trim()) return
-    const desc = novaDesc.trim()
+    const desc  = novaDesc.trim()
+    const prazo = novoPrazo || null
     setNovaDesc("")
+    setNovoPrazo("")
     setAddindo(false)
     setSalvandoNova(true)
 
     // Otimista: insere com id temporário negativo
     const tmpId = -(Date.now())
-    setAcoes((prev) => [...prev, { id: tmpId, descricao: desc, feita: false }])
+    setAcoes((prev) => [...prev, {
+      id: tmpId, descricao: desc, feita: false,
+      prazo: prazo ? `${prazo}T03:00:00.000Z` : null,
+    }])
 
     const res = await fetch(`/api/demandas/${demandaId}/acoes`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ descricao: desc }),
+      body:    JSON.stringify({ descricao: desc, prazo }),
     })
     const data = await res.json()
     // Substitui id temporário pelo real
@@ -106,9 +145,10 @@ export default function AcoesInterativas({ demandaId, acoes: acoesInit }: Props)
     setSalvandoNova(false)
   }
 
-  const total     = acoes.length
-  const feitas    = acoes.filter((a) => a.feita).length
+  const total       = acoes.length
+  const feitas      = acoes.filter((a) => a.feita).length
   const todasFeitas = total > 0 && feitas === total
+  const vencidas    = acoes.filter((a) => !a.feita && a.prazo && isoParaData(a.prazo) < hojeISO).length
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-5 mb-4">
@@ -116,6 +156,11 @@ export default function AcoesInterativas({ demandaId, acoes: acoesInit }: Props)
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-semibold text-slate-700">Próximas ações</p>
         <div className="flex items-center gap-2">
+          {vencidas > 0 && (
+            <span className="text-xs font-medium text-red-600">
+              {vencidas} vencida{vencidas === 1 ? "" : "s"}
+            </span>
+          )}
           {total > 0 && (
             <span className={`text-xs font-medium ${todasFeitas ? "text-emerald-600" : "text-slate-400"}`}>
               {feitas}/{total}
@@ -127,84 +172,126 @@ export default function AcoesInterativas({ demandaId, acoes: acoesInit }: Props)
 
       {/* Lista */}
       <div className="space-y-1.5">
-        {acoes.map((acao) => (
-          <div key={acao.id} className="group flex items-start gap-2.5">
-            {/* Checkbox */}
-            <button
-              onClick={() => toggleFeita(acao)}
-              disabled={loadingId === acao.id}
-              className="shrink-0 mt-0.5 disabled:opacity-40"
-            >
-              {loadingId === acao.id ? (
-                <Loader2 size={16} className="animate-spin text-slate-400" />
+        {acoes.map((acao) => {
+          const prazoData = isoParaData(acao.prazo)
+          const vencida   = !acao.feita && prazoData !== "" && prazoData <  hojeISO
+          const ehHoje    = !acao.feita && prazoData !== "" && prazoData === hojeISO
+
+          return (
+            <div key={acao.id} className="group flex items-start gap-2.5">
+              {/* Checkbox */}
+              <button
+                onClick={() => toggleFeita(acao)}
+                disabled={loadingId === acao.id}
+                className="shrink-0 mt-0.5 disabled:opacity-40"
+              >
+                {loadingId === acao.id ? (
+                  <Loader2 size={16} className="animate-spin text-slate-400" />
+                ) : (
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                    acao.feita
+                      ? "bg-emerald-500 border-emerald-500"
+                      : "border-slate-300 hover:border-emerald-400"
+                  }`}>
+                    {acao.feita && <Check size={10} strokeWidth={3} className="text-white" />}
+                  </div>
+                )}
+              </button>
+
+              {/* Descrição ou editor inline */}
+              {editandoId === acao.id ? (
+                <div className="flex-1 flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={tmpDesc}
+                    autoFocus
+                    onChange={(e) => setTmpDesc(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") salvarEdicao(acao.id)
+                      if (e.key === "Escape") cancelarEdicao()
+                    }}
+                    maxLength={1000}
+                    className="flex-1 text-sm text-gray-800 bg-white border border-violet-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  />
+                  <button
+                    onClick={() => salvarEdicao(acao.id)}
+                    disabled={!tmpDesc.trim()}
+                    className="text-emerald-600 hover:text-emerald-700 disabled:opacity-40"
+                  >
+                    <Check size={14} strokeWidth={2.5} />
+                  </button>
+                  <button onClick={cancelarEdicao} className="text-slate-400 hover:text-slate-600">
+                    <X size={14} strokeWidth={2} />
+                  </button>
+                </div>
               ) : (
-                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                  acao.feita
-                    ? "bg-emerald-500 border-emerald-500"
-                    : "border-slate-300 hover:border-emerald-400"
-                }`}>
-                  {acao.feita && <Check size={10} strokeWidth={3} className="text-white" />}
+                <span
+                  className={`flex-1 text-sm leading-snug ${
+                    acao.feita ? "line-through text-slate-400" : "text-slate-700"
+                  }`}
+                >
+                  {acao.descricao}
+                </span>
+              )}
+
+              {/* Prazo: input aberto, badge, ou nada */}
+              {prazoAbertoId === acao.id ? (
+                <input
+                  type="date"
+                  autoFocus
+                  defaultValue={prazoData}
+                  onChange={(e) => salvarPrazo(acao.id, e.target.value)}
+                  onBlur={() => setPrazoAbertoId(null)}
+                  onKeyDown={(e) => { if (e.key === "Escape") setPrazoAbertoId(null) }}
+                  className="shrink-0 text-xs text-gray-800 bg-white border border-violet-400 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                />
+              ) : prazoData ? (
+                <button
+                  onClick={() => setPrazoAbertoId(acao.id)}
+                  title={vencida ? "Prazo vencido — clique para alterar" : "Alterar prazo"}
+                  className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                    acao.feita ? "bg-slate-100 text-slate-400"
+                    : vencida  ? "bg-red-50 text-red-600 hover:bg-red-100"
+                    : ehHoje   ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                    :            "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <CalendarClock size={10} strokeWidth={2} />
+                  {ehHoje ? "hoje" : dataCurta(prazoData)}
+                </button>
+              ) : null}
+
+              {/* Ações de edição/exclusão (visíveis no hover) */}
+              {editandoId !== acao.id && (
+                <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+                  {!prazoData && prazoAbertoId !== acao.id && (
+                    <button
+                      onClick={() => setPrazoAbertoId(acao.id)}
+                      className="text-slate-300 hover:text-violet-600 transition-colors"
+                      title="Definir prazo"
+                    >
+                      <CalendarPlus size={12} strokeWidth={2} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => iniciarEdicao(acao)}
+                    className="text-slate-300 hover:text-slate-600 transition-colors"
+                    title="Editar"
+                  >
+                    <Pencil size={12} strokeWidth={2} />
+                  </button>
+                  <button
+                    onClick={() => excluir(acao.id)}
+                    className="text-slate-300 hover:text-red-500 transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 size={12} strokeWidth={2} />
+                  </button>
                 </div>
               )}
-            </button>
-
-            {/* Descrição ou editor inline */}
-            {editandoId === acao.id ? (
-              <div className="flex-1 flex items-center gap-1.5">
-                <input
-                  type="text"
-                  value={tmpDesc}
-                  autoFocus
-                  onChange={(e) => setTmpDesc(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") salvarEdicao(acao.id)
-                    if (e.key === "Escape") cancelarEdicao()
-                  }}
-                  maxLength={1000}
-                  className="flex-1 text-sm text-gray-800 bg-white border border-violet-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                />
-                <button
-                  onClick={() => salvarEdicao(acao.id)}
-                  disabled={!tmpDesc.trim()}
-                  className="text-emerald-600 hover:text-emerald-700 disabled:opacity-40"
-                >
-                  <Check size={14} strokeWidth={2.5} />
-                </button>
-                <button onClick={cancelarEdicao} className="text-slate-400 hover:text-slate-600">
-                  <X size={14} strokeWidth={2} />
-                </button>
-              </div>
-            ) : (
-              <span
-                className={`flex-1 text-sm leading-snug ${
-                  acao.feita ? "line-through text-slate-400" : "text-slate-700"
-                }`}
-              >
-                {acao.descricao}
-              </span>
-            )}
-
-            {/* Ações de edição/exclusão (visíveis no hover) */}
-            {editandoId !== acao.id && (
-              <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
-                <button
-                  onClick={() => iniciarEdicao(acao)}
-                  className="text-slate-300 hover:text-slate-600 transition-colors"
-                  title="Editar"
-                >
-                  <Pencil size={12} strokeWidth={2} />
-                </button>
-                <button
-                  onClick={() => excluir(acao.id)}
-                  className="text-slate-300 hover:text-red-500 transition-colors"
-                  title="Excluir"
-                >
-                  <Trash2 size={12} strokeWidth={2} />
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+            </div>
+          )
+        })}
       </div>
 
       {/* Campo de nova ação */}
@@ -218,11 +305,18 @@ export default function AcoesInterativas({ demandaId, acoes: acoesInit }: Props)
             onChange={(e) => setNovaDesc(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") adicionarAcao()
-              if (e.key === "Escape") { setAddindo(false); setNovaDesc("") }
+              if (e.key === "Escape") { setAddindo(false); setNovaDesc(""); setNovoPrazo("") }
             }}
             placeholder="Descreva a ação…"
             maxLength={1000}
             className="flex-1 text-sm text-gray-800 bg-white border border-violet-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+          />
+          <input
+            type="date"
+            value={novoPrazo}
+            onChange={(e) => setNovoPrazo(e.target.value)}
+            title="Prazo (opcional)"
+            className="shrink-0 text-xs text-gray-800 bg-white border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
           />
           <button
             onClick={adicionarAcao}
@@ -232,7 +326,7 @@ export default function AcoesInterativas({ demandaId, acoes: acoesInit }: Props)
             <Check size={14} strokeWidth={2.5} />
           </button>
           <button
-            onClick={() => { setAddindo(false); setNovaDesc("") }}
+            onClick={() => { setAddindo(false); setNovaDesc(""); setNovoPrazo("") }}
             className="text-slate-400 hover:text-slate-600"
           >
             <X size={14} strokeWidth={2} />

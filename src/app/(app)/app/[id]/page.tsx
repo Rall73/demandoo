@@ -2,11 +2,13 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { hojeNoBrasil } from "@/lib/date"
+import { hojeNoBrasil, hojeISOBrasil } from "@/lib/date"
 import { ArrowLeft, Calendar, Mic, AlertTriangle, Sparkles, User, Printer } from "lucide-react"
 import DetalheActions from "./DetalheActions"
 import DetalheContent from "./DetalheContent"
 import AcoesInterativas from "./AcoesInterativas"
+import RelacoesSection from "./RelacoesSection"
+import { carregarRelacoes } from "@/lib/relacoes-db"
 import ComentariosSection, { type ComentarioItem, type AnexoItem } from "./ComentariosSection"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -75,6 +77,8 @@ export default async function DetalhePage({
   })
 
   if (!demanda) notFound()
+
+  const relacoes = await carregarRelacoes(demanda.id, companyId)
 
   const aiQuota     = session!.user.aiQuota
   const aiUsed      = session!.user.aiUsedTotal
@@ -244,8 +248,17 @@ export default async function DetalhePage({
       {/* ── Ações interativas ───────────────────────────────────────────────────── */}
       <AcoesInterativas
         demandaId={demanda.id}
-        acoes={demanda.acoes.map((a) => ({ id: a.id, descricao: a.descricao, feita: a.feita }))}
+        hojeISO={hojeISOBrasil()}
+        acoes={demanda.acoes.map((a) => ({
+          id:        a.id,
+          descricao: a.descricao,
+          feita:     a.feita,
+          prazo:     a.prazo?.toISOString() ?? null,
+        }))}
       />
+
+      {/* ── Demandas vinculadas ─────────────────────────────────────────────────── */}
+      <RelacoesSection demandaId={demanda.id} relacoes={relacoes} />
 
       {/* ── Histórico + Relatório IA ────────────────────────────────────────────── */}
       <ComentariosSection

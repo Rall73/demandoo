@@ -78,6 +78,17 @@ export function parseDateBRT(iso: string): Date {
 }
 
 /**
+ * Converte um valor vindo de body JSON (`<input type="date">`) em Date de
+ * meia-noite BRT. Vazio, nulo ou fora do formato YYYY-MM-DD vira null —
+ * usado em campos de prazo opcionais.
+ */
+export function parseDataOpcionalBRT(valor: unknown): Date | null {
+  if (typeof valor !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return null
+  const d = parseDateBRT(valor)
+  return isNaN(d.getTime()) ? null : d
+}
+
+/**
  * Converte um Date do banco (UTC) para string YYYY-MM-DD em BRT.
  */
 export function toDateBRT(d: Date): string {

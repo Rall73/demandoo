@@ -2,7 +2,7 @@
 
 > Leia este arquivo antes de planejar qualquer feature.
 > Para o estado atual e backlog, ver `_docs/PIPELINE.md`.
-> Última atualização: 2026-08-02 (v1.6)
+> Última atualização: 2026-08-02 (v1.8)
 
 ---
 
@@ -66,7 +66,8 @@ plans
               │     ├── acoes_demanda
               │     ├── comentarios
               │     ├── anexos
-              │     └── demanda_tags ──→ tags
+              │     ├── demanda_tags ──→ tags
+              │     └── demanda_relacoes (auto-relacional: demanda ↔ demanda)
               └── listas
                     └── itens_lista
 accounts / sessions / verification_tokens  (Auth.js)
@@ -151,6 +152,27 @@ Criada automaticamente ao tirar um item do foco. Desde **v1.5.1** é **editável
 | `companyId` | INT | isolamento tenant |
 
 Tabela associativa: **hard delete** ao desassociar; `@@unique([demandaId, tagId])`. Sincronização em `src/lib/tags.ts` (`merge` na criação, `replace` na edição).
+
+### Tabela `demanda_relacoes` (v1.8)
+
+Vínculo direto entre duas demandas — continuidade e desdobramento. **Não** é agrupamento
+por tag: tag agrupa, o vínculo dá direção e cadeia.
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `companyId` | INT | isolamento tenant |
+| `demandaOrigemId` | INT | o item **anterior** da cadeia (FK demandas, CASCADE) |
+| `demandaDestinoId` | INT | o item que veio **depois** (FK demandas, CASCADE) |
+| `tipo` | ENUM | `CONTINUACAO` \| `DESDOBRAMENTO` \| `RELACIONADA` |
+
+O registro é direcional, mas a **leitura é bidirecional** (`OR` nos dois lados): uma única
+linha aparece nas duas pontas, com rótulo invertido conforme o lado (`sentido` = ADIANTE
+quando a demanda consultada é a origem). Rótulos e opções em `src/lib/relacoes.ts` (puro,
+importável por componente client); a consulta em `src/lib/relacoes-db.ts`.
+
+`@@unique([demandaOrigemId, demandaDestinoId])` impede duplicar o par **na mesma direção** —
+o par invertido (B→A) o banco aceita, então o `POST` da API checa os dois sentidos antes de
+criar. Tabela associativa: **hard delete** ao desvincular, como `demanda_tags`.
 
 ### Planos atuais
 
@@ -262,7 +284,8 @@ demandoo/
 │   │       │   ├── route.ts           # GET + POST (pipeline IA)
 │   │       │   └── [id]/
 │   │       │       ├── route.ts       # GET + PATCH (+ auto-log status, focoEncerradoEm) + DELETE
-│   │       │       ├── acoes/         # POST + [acaoId] PATCH/DELETE
+│   │       │       ├── acoes/         # POST + [acaoId] PATCH/DELETE (aceitam prazo, v1.7)
+│       │       ├── relacoes/      # GET+POST, [relacaoId] DELETE, candidatos (v1.8)
 │   │       │       ├── calendar.ics/
 │   │       │       ├── comentarios/   # GET + POST + [cId] PATCH/DELETE
 │   │       │       └── relatorio/     # POST (gerar IA) + PATCH (salvar)
@@ -281,6 +304,8 @@ demandoo/
 │       ├── openai.ts                  # Lazy singleton
 │       ├── cloudinary.ts
 │       ├── tags.ts                    # parse de #, normalização, sincronização de tags
+│       ├── relacoes.ts                # vínculos: rótulos/opções/tipos (puro, sem prisma)
+│       ├── relacoes-db.ts             # vínculos: carregamento bidirecional
 │       └── email.ts                   # Nodemailer + templates
 ```
 
@@ -341,6 +366,8 @@ demandoo/
 | Export PDF via link direto | Não existe API de PDF no browser — usar `window.print()` com `document.title` definido antes. Automação via `?pdf=1` + componente `AutoPrint` |
 | Input de chips perde texto não confirmado | Tag digitada sem Enter/vírgula se perdia ao submeter — `TagInput` confirma a tag pendente no `onBlur`; sugestão usa `onMouseDown`+`preventDefault` p/ não duplicar |
 | Timer JS desacelera em aba de fundo | Pomodoro conta por **timestamp** (`Date.now() - inicio`), nunca somando ticks de `setInterval` |
+| `@@unique` em par de FKs auto-relacional | Só cobre a direção declarada — (B,A) passa pelo unique de (A,B). Checar os dois sentidos na API antes de criar |
+| Campo de data opcional em body JSON | Validar formato antes de converter — `parseDataOpcionalBRT` devolve `null` para vazio/inválido, evitando `Invalid Date` gravado no banco. `undefined` no body = não mexe no campo; `null` = limpa |
 | `<input type="datetime-local">` e fuso | Retorna string sem timezone — tratar como **BRT** e converter com `parseDateTimeBRT`/`toDateTimeLocalBRT`; nunca `new Date(inputValue)` cru |
 
 ---
@@ -358,6 +385,8 @@ demandoo/
 | **Asaas como gateway de billing** | BR nativo, Pix + boleto + cartão, recorrência nativa, sem câmbio |
 | Pomodoro como widget global (não por demanda) | Foco "livre" que segue entre telas; estado no client (localStorage), zero schema |
 | Ciclo de pomodoro na timeline do Diário (não em `sessoes_foco`) | Não inflar o "Tempo de foco" das demandas; no documento impresso vira seção "Pomodoro" |
+| Vínculo direcional com leitura bidirecional (`demanda_relacoes`) | Uma linha só, sem espelho a manter em sincronia; o `sentido` inverte o rótulo na exibição. Tag agrupa, vínculo dá direção e cadeia |
+| `lib/relacoes.ts` separado de `lib/relacoes-db.ts` | Componente client importa os rótulos; se o módulo importasse prisma, o client acabaria no bundle do browser |
 | Tags relacionais (`tags` + `demanda_tags`) | Autocomplete, contagem e isolamento por empresa; IA sugere tags no pipeline |
 
 ---

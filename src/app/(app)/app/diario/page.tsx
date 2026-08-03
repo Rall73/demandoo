@@ -101,10 +101,10 @@ export default async function DiarioPage({
       orderBy: [{ prioridade: "asc" }, { titulo: "asc" }],
     }),
 
+    // Inclui as já cumpridas: elas seguem no dia, marcadas — não somem ao concluir
     prisma.acaoDemanda.findMany({
       where: {
         deletedAt: null,
-        feita:     false,
         prazo:     { gte: inicioDia, lt: fimDia },
         demanda:   { companyId, userId, deletedAt: null },
       },
@@ -114,6 +114,8 @@ export default async function DiarioPage({
         feita:     true,
         demanda:   { select: { id: true, titulo: true, tipo: true } },
       },
+      // ordem fixa: a ação não muda de lugar ao ser marcada
+      orderBy: { id: "asc" },
     }),
 
     prisma.comentario.findMany({

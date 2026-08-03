@@ -4,7 +4,7 @@ import { parseDateBRT } from "@/lib/date"
 import {
   Phone, Mail, Users2, PenLine,
   Inbox, CheckSquare, Lightbulb,
-  Clock, CheckCircle2, Timer,
+  Clock, CheckCircle2, Timer, Check,
 } from "lucide-react"
 import PrintButton from "./PrintButton"
 import AutoPrint   from "@/components/AutoPrint"
@@ -79,11 +79,13 @@ export default async function DiarioImprimirPage({ params, searchParams }: Ctx) 
       select:  { id: true, titulo: true, tipo: true, prioridade: true, status: true },
       orderBy: [{ prioridade: "asc" }, { titulo: "asc" }],
     }),
+    // Inclui as cumpridas — o documento do dia mostra o que venceu e o que foi feito
     prisma.acaoDemanda.findMany({
-      where:  { deletedAt: null, feita: false, prazo: { gte: inicioDia, lt: fimDia },
+      where:  { deletedAt: null, prazo: { gte: inicioDia, lt: fimDia },
                 demanda: { companyId, userId, deletedAt: null } },
       select: { id: true, descricao: true, feita: true,
                 demanda: { select: { id: true, titulo: true, tipo: true } } },
+      orderBy: { id: "asc" },
     }),
     diario
       ? prisma.comentario.findMany({
@@ -182,9 +184,17 @@ export default async function DiarioImprimirPage({ params, searchParams }: Ctx) 
             <div className="flex flex-col">
               {acoesHoje.map((a) => (
                 <div key={a.id} className="entry-row flex items-start gap-2 py-1.5 border-b border-slate-100 last:border-0">
-                  <span className="w-4 h-4 rounded-full border-2 border-slate-300 shrink-0 mt-0.5" />
+                  {a.feita ? (
+                    <span className="w-4 h-4 rounded-full bg-emerald-500 shrink-0 mt-0.5 flex items-center justify-center">
+                      <Check size={9} strokeWidth={3} className="text-white" />
+                    </span>
+                  ) : (
+                    <span className="w-4 h-4 rounded-full border-2 border-slate-300 shrink-0 mt-0.5" />
+                  )}
                   <div>
-                    <p className="text-slate-800 leading-snug">{a.descricao}</p>
+                    <p className={`leading-snug ${a.feita ? "line-through text-slate-400" : "text-slate-800"}`}>
+                      {a.descricao}
+                    </p>
                     <p className="text-xs text-slate-400 mt-0.5">{a.demanda.titulo}</p>
                   </div>
                 </div>

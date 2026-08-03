@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { parseDataOpcionalBRT } from "@/lib/date"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -12,6 +13,7 @@ export async function POST(req: Request, { params }: Ctx) {
     const { id } = await params
     const body   = await req.json()
     const { descricao } = body
+    const prazo  = parseDataOpcionalBRT(body.prazo)
 
     if (!descricao?.trim()) {
       return NextResponse.json({ error: "Descrição obrigatória" }, { status: 400 })
@@ -37,6 +39,7 @@ export async function POST(req: Request, { params }: Ctx) {
         demandaId: Number(id),
         descricao: descricao.trim().slice(0, 1000),
         ordem:     proxOrdem,
+        prazo,
       },
     })
 

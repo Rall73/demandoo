@@ -59,12 +59,14 @@ export async function GET(_: Request, { params }: Ctx) {
         select:  { id: true, titulo: true, tipo: true },
         orderBy: [{ prioridade: "asc" }, { titulo: "asc" }],
       }),
+      // Inclui as cumpridas — o documento mostra o que venceu e o que foi feito
       prisma.acaoDemanda.findMany({
-        where:  { deletedAt: null, feita: false,
+        where:  { deletedAt: null,
                   prazo:    { gte: inicioDia, lt: fimDia },
                   demanda:  { companyId, userId, deletedAt: null } },
-        select: { id: true, descricao: true,
+        select: { id: true, descricao: true, feita: true,
                   demanda: { select: { titulo: true } } },
+        orderBy: { id: "asc" },
       }),
       diario
         ? prisma.comentario.findMany({
@@ -113,9 +115,11 @@ export async function GET(_: Request, { params }: Ctx) {
       <table width="100%" cellpadding="4" cellspacing="0" style="border-collapse:collapse;">
         ${acoesHoje.map((a) => `
           <tr style="border-bottom:1px solid #f1f5f9;">
-            <td width="20" style="color:#94a3b8;">&#9675;</td>
+            <td width="20" valign="top" style="color:${a.feita ? "#10b981" : "#94a3b8"};">
+              ${a.feita ? "&#10003;" : "&#9675;"}
+            </td>
             <td>
-              <div style="color:#1e293b;">${a.descricao}</div>
+              <div style="color:${a.feita ? "#94a3b8" : "#1e293b"};${a.feita ? "text-decoration:line-through;" : ""}">${a.descricao}</div>
               <div style="font-size:9pt;color:#94a3b8;">${a.demanda.titulo}</div>
             </td>
           </tr>

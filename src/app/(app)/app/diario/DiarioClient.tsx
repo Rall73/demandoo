@@ -385,6 +385,11 @@ export default function DiarioClient({
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
                 <CheckCircle2 size={12} strokeWidth={2.5} />
                 Ações de hoje
+                <span className={`ml-auto normal-case tracking-normal ${
+                  acoes.every((a) => a.feita) ? "text-emerald-600" : "text-slate-400"
+                }`}>
+                  {acoes.filter((a) => a.feita).length}/{acoes.length}
+                </span>
               </h2>
               <div className="flex flex-col gap-2">
                 {acoes.map((a) => {

@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-08-02 (v1.6)
+> **Última atualização:** 2026-08-02 (v1.8)
 
 ---
 
@@ -143,6 +143,19 @@ CREATE TABLE `demanda_tags` (
   CONSTRAINT `fk_dtags_demanda` FOREIGN KEY (`demandaId`) REFERENCES `demandas`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_dtags_tag`     FOREIGN KEY (`tagId`)     REFERENCES `tags`(`id`)     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- v1.8 — vínculo entre demandas (cópia em _docs/sql-relacoes.sql)
+CREATE TABLE `demanda_relacoes` (
+  `id` INT NOT NULL AUTO_INCREMENT, `companyId` INT NOT NULL,
+  `demandaOrigemId` INT NOT NULL, `demandaDestinoId` INT NOT NULL,
+  `tipo` ENUM('CONTINUACAO','DESDOBRAMENTO','RELACIONADA') NOT NULL DEFAULT 'RELACIONADA',
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`), UNIQUE KEY `uq_demanda_relacao` (`demandaOrigemId`,`demandaDestinoId`),
+  INDEX `idx_drel_origem` (`demandaOrigemId`), INDEX `idx_drel_destino` (`demandaDestinoId`),
+  INDEX `idx_drel_company` (`companyId`),
+  CONSTRAINT `fk_drel_origem`  FOREIGN KEY (`demandaOrigemId`)  REFERENCES `demandas`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_drel_destino` FOREIGN KEY (`demandaDestinoId`) REFERENCES `demandas`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 ---
@@ -274,6 +287,9 @@ CREATE TABLE `demanda_tags` (
 | `/api/diario/[data]/exportar-doc` | GET (gera `.doc` Word) | ✅ |
 | `/api/diario/pomodoro` | POST (registra ciclo de foco no Diário) | ✅ |
 | `/api/resumo/[mes]/exportar-doc` | GET (gera `.doc` Word do fechamento mensal) | ✅ |
+| `/api/demandas/[id]/relacoes` | GET, POST | ✅ |
+| `/api/demandas/[id]/relacoes/[relacaoId]` | DELETE (hard) | ✅ |
+| `/api/demandas/[id]/relacoes/candidatos` | GET (autocomplete de vínculo) | ✅ |
 | `/api/sessoes-foco` | POST + [id] PATCH/DELETE (editar tempo de foco) | ✅ |
 | `/api/tags` | GET (autocomplete de tags da empresa) | ✅ |
 | `/api/demandas/[id]/relatorio` | POST (gerar IA), PATCH (salvar edição) | ✅ |
@@ -445,6 +461,55 @@ Fechamento mensal em `/app/resumo?mes=YYYY-MM`. **Zero mudança de schema** — 
 > foto do fim do mês. As métricas de fluxo (abertas / concluídas / entregues no prazo) são exatas,
 > pois derivam de `createdAt` e `concluidoAt`. A UI diz isso explicitamente ao usuário.
 
+### ✅ 4.25 Prazo nas ações (v1.7)
+
+A coluna `acoes_demanda.prazo` existia no schema desde o início e o Diário já a consultava,
+mas não havia caminho de escrita — o painel "Ações de hoje" nunca mostrava nada.
+**Sem SQL:** a coluna já estava nos dois bancos.
+
+| Item | Status |
+|---|---|
+| `POST /api/demandas/[id]/acoes` aceita `prazo` (opcional) | ✅ |
+| `PATCH /api/demandas/[id]/acoes/[acaoId]` aceita `prazo` (string define, `null` limpa) | ✅ |
+| Helper `parseDataOpcionalBRT` em `src/lib/date.ts` — valida YYYY-MM-DD e converte p/ meia-noite BRT | ✅ |
+| Checklist do detalhe: ícone `CalendarPlus` no hover define prazo; badge clicável altera | ✅ |
+| Badge por situação: vermelho vencida, âmbar "hoje", cinza futura/concluída | ✅ |
+| Contador "N vencidas" no cabeçalho de Próximas ações | ✅ |
+| Campo de data opcional na linha de nova ação | ✅ |
+| `hojeISO` calculado no servidor e passado ao client — sem `new Date()` cru no browser | ✅ |
+| Reflexo automático no painel "Ações de hoje" do Diário e na impressão do Diário | ✅ |
+| Ação cumprida **permanece** no Diário do dia, marcada (antes sumia: a query filtrava `feita: false`) | ✅ |
+| Ordem fixa por `id` — a ação não muda de lugar ao ser marcada | ✅ |
+| Contador `feitas/total` no cabeçalho "Ações de hoje"; check verde + risco na impressão e no Word | ✅ |
+
+> **Fora do escopo desta versão:** ações com prazo **não** aparecem no Calendário
+> (segue em 6.4 como melhoria). O Calendário continua mostrando só demandas.
+
+### ✅ 4.26 Vínculo entre demandas (v1.8)
+
+Vínculo **direto** entre itens (não agrupamento por tag), para registrar continuidade e
+desdobramento e alimentar relatórios de cadeia no futuro.
+SQL em `_docs/sql-relacoes.sql` — rodado em dev + prod em 2026-08-02.
+
+| Item | Status |
+|---|---|
+| Tabela `demanda_relacoes` + enum `RelacaoTipo` (CONTINUACAO / DESDOBRAMENTO / RELACIONADA) | ✅ |
+| Registro direcional (`origem` = item anterior), leitura bidirecional — uma linha, duas pontas | ✅ |
+| `src/lib/relacoes.ts` (puro: rótulos, opções, tipos) + `relacoes-db.ts` (consulta) | ✅ |
+| `GET` / `POST /api/demandas/[id]/relacoes` | ✅ |
+| `DELETE /api/demandas/[id]/relacoes/[relacaoId]` — hard delete | ✅ |
+| `GET /api/demandas/[id]/relacoes/candidatos?q=` — autocomplete, exclui já vinculadas e DIARIO | ✅ |
+| Seção "Demandas vinculadas" no detalhe, com 5 opções de natureza do vínculo | ✅ |
+| Trava: não vincula a si mesma; par duplicado em qualquer direção retorna 409 | ✅ |
+| Isolamento: as duas pontas validadas por `companyId` **e** `userId` da sessão | ✅ |
+| Vínculo de demanda soft-deletada não é exibido | ✅ |
+
+> **Verificado no banco dev:** duplicata na mesma direção é barrada pelo unique (P2002);
+> o par invertido (B→A) o **banco aceita** — a trava é só da API, por isso o `POST` checa
+> os dois sentidos antes de criar. Não confiar apenas no unique.
+
+> **Fora do escopo:** vínculos não aparecem na impressão nem no relatório IA (segue em 6.4).
+
 ### ✅ 4.16 Páginas Públicas
 
 | Página | Status |
@@ -491,32 +556,9 @@ npx tsc --noEmit && npx next build
 Sequência acordada com o Ricardo. Ordem deliberada: do menor risco para o maior,
 para não desestruturar o que já funciona.
 
-#### v1.7 — Prazo nas ações (tarefas internas)
+#### ~~v1.7 — Prazo nas ações~~ ✅ entregue em 2026-08-02 (ver 4.25)
 
-O campo **`acoes_demanda.prazo` já existe no schema** e o Diário **já consulta ações
-com prazo de hoje** (`diario/page.tsx` e a página de impressão). Falta só o caminho de
-escrita — hoje o painel "Ações de hoje" do Diário nunca mostra nada por falta de UI.
-
-| Item | Prioridade |
-|---|---|
-| `POST/PATCH /api/demandas/[id]/acoes` aceitar `prazo` | 🔴 |
-| Input de data por ação no checklist do detalhe | 🔴 |
-| Badge de prazo/atraso na ação; ações com prazo entram no Calendário | 🟡 |
-
-> Sem SQL: a coluna já existe nos dois bancos.
-
-#### v1.8 — Vínculo direto entre demandas
-
-Decisão do Ricardo: **não é agrupar por tag, é vínculo direto** entre itens (continuidade
-e desdobramento), para alimentar relatórios de cadeia no futuro.
-
-| Item | Prioridade |
-|---|---|
-| Tabela `demanda_relacoes` (`companyId`, `demandaOrigemId`, `demandaDestinoId`, `tipo`, `createdAt`) | 🔴 |
-| `tipo`: `CONTINUACAO` \| `DESDOBRAMENTO` \| `RELACIONADA`; unique no par; `ON DELETE CASCADE` | 🔴 |
-| Leitura bidirecional (`OR` nos dois lados) — o vínculo aparece nas duas pontas | 🔴 |
-| UI no detalhe: busca por título (padrão do `TagInput`) + chips das demandas conectadas | 🔴 |
-| Incluir vínculos na impressão e no relatório IA | 🟡 |
+#### ~~v1.8 — Vínculo direto entre demandas~~ ✅ entregue em 2026-08-02 (ver 4.26)
 
 #### v1.9 — Delegação em cadeia (desenho aprovado: **demanda-filha**)
 
@@ -587,6 +629,8 @@ criar demanda nova por cron — esta última polui dashboard e resumo mensal com
 | Delegação vinculada a `userId` (hoje texto livre) | 🟡 |
 | Paginação nas listagens (hoje limit 100/200) | 🟡 |
 | Export CSV da lista com filtros aplicados | 🟡 |
+| Ações com prazo aparecerem no Calendário (hoje só demandas) | 🟡 |
+| Vínculos entre demandas na impressão e no relatório IA | 🟡 |
 | Drag & drop para reordenar ações | 🟢 |
 | Busca global (Ctrl+K) — incluir filtro por tag server-side | 🟢 |
 | Seletor de tags dedicado na barra de filtros da lista (hoje: clique no chip ou busca) | 🟢 |
@@ -644,6 +688,8 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 | 2026-06-21 | v1.5 | Pomodoro global (widget flutuante) com registro de ciclos no Diário; sistema de Tags (relacional, IA sugere, autocomplete, filtro na lista) |
 | 2026-06-21 | v1.5.1 | Edição de tempo de foco no Diário (editar/adicionar/excluir sessões via `/api/sessoes-foco`); aviso de sessão longa (>6h) no Quadro de Foco; hardening de dependências (nodemailer 9, TLS estrito) |
 | 2026-08-02 | v1.6 | Resumo do mês: fechamento mensal em `/app/resumo` com movimento por tipo, prazos, tempo de foco, Diário, tags e comparativo com o mês anterior; impressão, PDF e Word. Sem mudança de schema |
+| 2026-08-02 | v1.7 | Prazo nas ações: API aceita `prazo`, definição inline no checklist do detalhe, badge por situação (vencida/hoje/futura) e contador de vencidas; acende o painel "Ações de hoje" do Diário, onde a ação cumprida permanece marcada em vez de sumir. Sem mudança de schema |
+| 2026-08-02 | v1.8 | Vínculo direto entre demandas: tabela `demanda_relacoes`, leitura bidirecional, seção "Demandas vinculadas" no detalhe com autocomplete e 5 naturezas de vínculo |
 
 ---
 

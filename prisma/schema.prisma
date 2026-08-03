@@ -188,6 +188,9 @@ model Demanda {
   sessoesFoco SessaoFoco[]
   tags        DemandaTag[]
 
+  relacoesOrigem  DemandaRelacao[] @relation("RelacaoOrigem")
+  relacoesDestino DemandaRelacao[] @relation("RelacaoDestino")
+
   @@index([companyId, userId])
   @@index([companyId, tipo])
   @@index([companyId, status])
@@ -291,6 +294,36 @@ model DemandaTag {
   @@index([tagId])
   @@index([companyId])
   @@map("demanda_tags")
+}
+
+// ─── Vínculo entre demandas ───────────────────────────────────────────────────
+
+enum RelacaoTipo {
+  CONTINUACAO    // destino dá continuidade à origem
+  DESDOBRAMENTO  // destino nasceu como desdobramento da origem
+  RELACIONADA    // vínculo sem direção definida
+}
+
+/// Vínculo direto entre duas demandas. Direcional: `origem` é o item anterior,
+/// `destino` é o que veio depois. A leitura é bidirecional (OR nos dois lados),
+/// então o vínculo aparece nas duas pontas sem registro duplicado.
+/// Tabela associativa: hard delete ao desvincular, como em `demanda_tags`.
+model DemandaRelacao {
+  id               Int         @id @default(autoincrement())
+  companyId        Int
+  demandaOrigemId  Int
+  demandaDestinoId Int
+  tipo             RelacaoTipo @default(RELACIONADA)
+  createdAt        DateTime    @default(now())
+
+  origem  Demanda @relation("RelacaoOrigem",  fields: [demandaOrigemId],  references: [id], onDelete: Cascade)
+  destino Demanda @relation("RelacaoDestino", fields: [demandaDestinoId], references: [id], onDelete: Cascade)
+
+  @@unique([demandaOrigemId, demandaDestinoId])
+  @@index([demandaOrigemId])
+  @@index([demandaDestinoId])
+  @@index([companyId])
+  @@map("demanda_relacoes")
 }
 
 // ─── Listas ───────────────────────────────────────────────────────────────────
