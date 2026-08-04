@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-08-02 (v1.8)
+> **Última atualização:** 2026-08-03 (v1.9.1)
 
 ---
 
@@ -290,6 +290,9 @@ CREATE TABLE `demanda_relacoes` (
 | `/api/demandas/[id]/relacoes` | GET, POST | ✅ |
 | `/api/demandas/[id]/relacoes/[relacaoId]` | DELETE (hard) | ✅ |
 | `/api/demandas/[id]/relacoes/candidatos` | GET (autocomplete de vínculo) | ✅ |
+| `/api/demandas/[id]/delegar` | POST (cria demanda-filha) | ✅ |
+| `/api/demandas/[id]/delegar/[delegacaoId]` | DELETE (cancela se intocada) | ✅ |
+| `/api/demandas/[id]/devolutiva` | POST (delegado registra retorno) | ✅ |
 | `/api/sessoes-foco` | POST + [id] PATCH/DELETE (editar tempo de foco) | ✅ |
 | `/api/tags` | GET (autocomplete de tags da empresa) | ✅ |
 | `/api/demandas/[id]/relatorio` | POST (gerar IA), PATCH (salvar edição) | ✅ |
@@ -510,6 +513,56 @@ SQL em `_docs/sql-relacoes.sql` — rodado em dev + prod em 2026-08-02.
 
 > **Fora do escopo:** vínculos não aparecem na impressão nem no relatório IA (segue em 6.4).
 
+### ✅ 4.27 Delegação em cadeia — núcleo (v1.9)
+
+Desenho **demanda-filha**: delegar cria uma demanda nova pertencente ao delegado,
+ligada à original. Cada um é dono do seu registro — por isso **nenhuma query
+existente precisou mudar**. A cadeia é de N níveis: a filha pode ser delegada de novo.
+SQL em `_docs/sql-delegacao.sql` — rodado em dev + prod em 2026-08-03.
+
+| Item | Status |
+|---|---|
+| Tabela `delegacoes` (origem, filha, por, para, prazoRetorno, devolutiva, respondidoAt) | ✅ |
+| `POST /api/demandas/[id]/delegar` — cria filha com a **instrução**, delegante vira solicitante | ✅ |
+| Instrução **obrigatória**, gravada em `delegacoes.instrucao` (imutável) e na descrição da filha | ✅ |
+| Checklist da mãe **não** é copiado — as ações continuam do delegante | ✅ |
+| `DELETE /api/demandas/[id]/delegar/[delegacaoId]` — cancela **só se a filha está intocada** | ✅ |
+| `POST /api/demandas/[id]/devolutiva` — delegado registra retorno, opcionalmente concluindo | ✅ |
+| `src/lib/delegacao.ts` (puro) + `delegacao-db.ts` (consultas + `membrosDelegaveis`) | ✅ |
+| Painel "Delegação" no detalhe: delegar / acompanhar / responder, nos três papéis | ✅ |
+| Acompanhamento da filha ao vivo: status, prazo, ações feitas/total, timeline, devolutiva | ✅ |
+| Cadeia visível: "repassada para X" quando a filha foi delegada adiante | ✅ |
+| Badge de situação: retorno vencido / hoje / registrado / concluída sem retorno | ✅ |
+| Auto-log nas duas pontas ao delegar, cancelar e devolver | ✅ |
+| **Substituição do texto livre:** campo "Delegado" vira seletor de membros | ✅ |
+| Delegação acontece **só no detalhe** — a captura não delega, pois a instrução obrigatória não cabe naquela tela | ✅ |
+| `demandas.delegadoUserId` (coluna que já existia) passa a ser preenchida de verdade | ✅ |
+
+> **Único ponto do app que cruza usuários:** a mãe lê o andamento da filha. O acesso
+> sempre passa pela linha de `delegacoes` e valida `companyId` — nunca por id solto.
+
+> **Armadilha corrigida no desenvolvimento:** `cancelavel` contava os comentários da
+> filha, mas a delegação sempre cria um auto-log `STATUS` nela — o botão de cancelar
+> nunca apareceria. Leitura e `DELETE` precisam usar a **mesma** regra (ignorar `STATUS`).
+
+> **Verificado no banco dev** (com usuário temporário, depois removido): filha criada com
+> solicitante correto, `cancelavel` true logo após delegar e false após nota do delegado,
+> segunda delegação para a mesma filha barrada pelo unique, devolutiva gravada, e cascade
+> removendo a delegação junto com a filha.
+
+> **Correção de desenho (v1.9.1, antes do push):** a primeira versão copiava o checklist
+> da mãe para a filha. Ficavam **dois checklists desconectados** — o delegado marcava os
+> dele e nada voltava para a mãe, que passava a exibir ações possivelmente já feitas.
+> Agora a delegação carrega só a **instrução**: as 5 ações da mãe continuam do delegante, e
+> cada delegação é um pedido específico com resposta específica. Delegar partes diferentes
+> para pessoas diferentes = várias delegações, cada uma com sua instrução.
+> A instrução fica em `delegacoes.instrucao` **e** na descrição da filha; o registro na
+> tabela é o imutável, já que o delegado pode editar a demanda dele.
+> SQL: `_docs/sql-delegacao-instrucao.sql`.
+
+> **Fora do escopo (vai para a v1.10):** abas Delegadas/Recebidas no Quadro de Foco e
+> e-mails de "nova demanda delegada" / "retorno registrado".
+
 ### ✅ 4.16 Páginas Públicas
 
 | Página | Status |
@@ -560,7 +613,23 @@ para não desestruturar o que já funciona.
 
 #### ~~v1.8 — Vínculo direto entre demandas~~ ✅ entregue em 2026-08-02 (ver 4.26)
 
-#### v1.9 — Delegação em cadeia (desenho aprovado: **demanda-filha**)
+#### ~~v1.9 — Delegação em cadeia (núcleo)~~ ✅ entregue em 2026-08-03 (ver 4.27)
+
+#### v1.10 — Delegação: Foco e notificações
+
+Resto da delegação, fatiado a pedido do Ricardo para testar o núcleo antes de
+mexer no Quadro de Foco, que é tela de uso diário.
+
+| Item | Prioridade |
+|---|---|
+| Foco: abas **Delegadas** (minhas que geraram filha) e **Recebidas** (minhas vindas de alguém) | 🔴 |
+| E-mail "nova demanda delegada" para o delegado | 🔴 |
+| E-mail "retorno registrado" para quem delegou | 🟡 |
+| Resumo do mês: bloco de delegações feitas/recebidas e taxa de retorno no prazo | 🟡 |
+| Regra de quem pode delegar para quem (hoje: qualquer membro ativo da empresa) | 🟡 |
+| "Promover ação a demanda" (vira demanda própria, vinculada via v1.8) e delegar a demanda | 🟡 |
+
+#### Desenho de referência da delegação (mantido para consulta)
 
 Delegar **cria uma demanda nova pertencente ao delegado**, ligada à original.
 Ricardo → Jussara → Daniel gera três demandas encadeadas, cada uma com seu dono.
@@ -689,6 +758,8 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 | 2026-06-21 | v1.5.1 | Edição de tempo de foco no Diário (editar/adicionar/excluir sessões via `/api/sessoes-foco`); aviso de sessão longa (>6h) no Quadro de Foco; hardening de dependências (nodemailer 9, TLS estrito) |
 | 2026-08-02 | v1.6 | Resumo do mês: fechamento mensal em `/app/resumo` com movimento por tipo, prazos, tempo de foco, Diário, tags e comparativo com o mês anterior; impressão, PDF e Word. Sem mudança de schema |
 | 2026-08-02 | v1.7 | Prazo nas ações: API aceita `prazo`, definição inline no checklist do detalhe, badge por situação (vencida/hoje/futura) e contador de vencidas; acende o painel "Ações de hoje" do Diário, onde a ação cumprida permanece marcada em vez de sumir. Sem mudança de schema |
+| 2026-08-03 | v1.9 | Delegação em cadeia (núcleo): tabela `delegacoes`, desenho demanda-filha, painel de delegação nos três papéis, devolutiva, cancelamento só se intocada; campo "Delegado" vira seletor de membros |
+| 2026-08-03 | v1.9.1 | Delegação passa a carregar **instrução** em vez de copiar o checklist da mãe (evita dois checklists desconectados); instrução obrigatória e registrada de forma imutável em `delegacoes.instrucao`. Captura: delegação removida da tela (não havia onde escrever a instrução) e prazo por ação adicionado |
 | 2026-08-02 | v1.8 | Vínculo direto entre demandas: tabela `demanda_relacoes`, leitura bidirecional, seção "Demandas vinculadas" no detalhe com autocomplete e 5 naturezas de vínculo |
 
 ---

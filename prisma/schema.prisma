@@ -76,6 +76,9 @@ model User {
   anexos      Anexo[]
   listas      Lista[]
 
+  delegacoesFeitas    Delegacao[] @relation("DelegouPor")
+  delegacoesRecebidas Delegacao[] @relation("DelegouPara")
+
   @@index([companyId])
   @@map("users")
 }
@@ -190,6 +193,9 @@ model Demanda {
 
   relacoesOrigem  DemandaRelacao[] @relation("RelacaoOrigem")
   relacoesDestino DemandaRelacao[] @relation("RelacaoDestino")
+
+  delegacoesFeitas  Delegacao[] @relation("DelegacaoOrigem")
+  delegacaoRecebida Delegacao?  @relation("DelegacaoFilha")
 
   @@index([companyId, userId])
   @@index([companyId, tipo])
@@ -324,6 +330,48 @@ model DemandaRelacao {
   @@index([demandaDestinoId])
   @@index([companyId])
   @@map("demanda_relacoes")
+}
+
+// ─── Delegação ────────────────────────────────────────────────────────────────
+
+/// Delegação de uma demanda a outro membro da empresa.
+///
+/// Desenho "demanda-filha": delegar **cria uma demanda nova pertencente ao
+/// delegado** (`filha`), ligada à original (`origem`). Cada um continua dono do
+/// seu registro, então nenhuma query existente precisou mudar — todas seguem
+/// filtrando por `userId`. A cadeia é de N níveis: a filha pode ser delegada de
+/// novo, gerando outra filha.
+///
+/// A leitura da filha a partir da mãe é o **único ponto do app que cruza
+/// usuários** — sempre via este vínculo e sempre validando `companyId`.
+model Delegacao {
+  id                 Int       @id @default(autoincrement())
+  companyId          Int
+  demandaOrigemId    Int
+  demandaFilhaId     Int
+  delegadoPorUserId  Int
+  delegadoParaUserId Int
+  /// O que foi pedido. Guardado aqui, e não só na descrição da filha, para que
+  /// o registro do pedido não mude quando o delegado editar a demanda dele.
+  instrucao          String?   @db.Text
+  /// Quando o delegante espera retorno — independe do prazo da filha
+  prazoRetorno       DateTime?
+  /// Texto que o delegado escreve ao devolver o resultado
+  devolutiva         String?   @db.Text
+  respondidoAt       DateTime?
+  createdAt          DateTime  @default(now())
+
+  origem       Demanda @relation("DelegacaoOrigem", fields: [demandaOrigemId], references: [id], onDelete: Cascade)
+  filha        Demanda @relation("DelegacaoFilha",  fields: [demandaFilhaId],  references: [id], onDelete: Cascade)
+  delegadoPor  User    @relation("DelegouPor",      fields: [delegadoPorUserId],  references: [id])
+  delegadoPara User    @relation("DelegouPara",     fields: [delegadoParaUserId], references: [id])
+
+  /// Uma filha nasce de exatamente uma delegação
+  @@unique([demandaFilhaId])
+  @@index([demandaOrigemId])
+  @@index([companyId])
+  @@index([delegadoParaUserId])
+  @@map("delegacoes")
 }
 
 // ─── Listas ───────────────────────────────────────────────────────────────────

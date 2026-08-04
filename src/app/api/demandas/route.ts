@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { getOpenAI } from "@/lib/openai"
-import { hojeISOBrasil, diaSemanaHojePT, parseDateBRT } from "@/lib/date"
+import { hojeISOBrasil, diaSemanaHojePT, parseDateBRT, parseDataOpcionalBRT } from "@/lib/date"
 import { sincronizarTags, parseTags, normalizarLista } from "@/lib/tags"
 
 export async function GET(req: Request) {
@@ -198,10 +198,16 @@ REGRAS:
       : (aiResult.tipo ?? "DEMANDA")
     ) as "DEMANDA" | "TAREFA" | "IDEIA"
     const prioridade = (prioBody    ?? aiResult.prioridade ?? "MEDIA")   as "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
-    // No modo manual usa ações enviadas no body; IA usa as geradas pelo GPT
-    const acoes = (manual
-      ? (acoesBody ?? [])
-      : (aiResult.acoes ?? [])) as string[]
+    // No modo manual usa ações enviadas no body; IA usa as geradas pelo GPT.
+    // A captura manual manda { descricao, prazo }; o GPT devolve string simples.
+    type AcaoEntrada = string | { descricao?: string; prazo?: string | null }
+    const acoes = ((manual ? (acoesBody ?? []) : (aiResult.acoes ?? [])) as AcaoEntrada[])
+      .map((a) =>
+        typeof a === "string"
+          ? { descricao: a.trim(), prazo: null }
+          : { descricao: String(a?.descricao ?? "").trim(), prazo: parseDataOpcionalBRT(a?.prazo) },
+      )
+      .filter((a) => a.descricao.length > 0)
 
     // No modo manual, usa descricao do body diretamente (aiResult está vazio)
     const descricaoFinal = manual ? (descricao ?? null) : (aiResult.descricao ?? descricao ?? null)
@@ -222,7 +228,11 @@ REGRAS:
         audioUrl:         audioUrl ?? null,
         aiProcessado:     usandoIA && !aiBlocked,
         acoes: {
-          create: acoes.map((desc: string, i: number) => ({ descricao: desc, ordem: i })),
+          create: acoes.map((a, i) => ({
+            descricao: a.descricao.slice(0, 1000),
+            prazo:     a.prazo,
+            ordem:     i,
+          })),
         },
       },
     })

@@ -2,7 +2,7 @@
 
 > Leia este arquivo antes de planejar qualquer feature.
 > Para o estado atual e backlog, ver `_docs/PIPELINE.md`.
-> Última atualização: 2026-08-02 (v1.8)
+> Última atualização: 2026-08-03 (v1.9.1)
 
 ---
 
@@ -67,7 +67,8 @@ plans
               │     ├── comentarios
               │     ├── anexos
               │     ├── demanda_tags ──→ tags
-              │     └── demanda_relacoes (auto-relacional: demanda ↔ demanda)
+              │     ├── demanda_relacoes (auto-relacional: demanda ↔ demanda)
+              │     └── delegacoes (mãe ↔ filha, entre usuários da empresa)
               └── listas
                     └── itens_lista
 accounts / sessions / verification_tokens  (Auth.js)
@@ -173,6 +174,37 @@ importável por componente client); a consulta em `src/lib/relacoes-db.ts`.
 `@@unique([demandaOrigemId, demandaDestinoId])` impede duplicar o par **na mesma direção** —
 o par invertido (B→A) o banco aceita, então o `POST` da API checa os dois sentidos antes de
 criar. Tabela associativa: **hard delete** ao desvincular, como `demanda_tags`.
+
+### Tabela `delegacoes` (v1.9)
+
+Delegação a outro membro da empresa, no desenho **demanda-filha**: delegar cria uma
+demanda nova pertencente ao delegado (`filha`), ligada à original (`origem`).
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `demandaOrigemId` | INT | a demanda-mãe, de quem delegou (FK, CASCADE) |
+| `demandaFilhaId` | INT | a demanda criada para o delegado (FK, CASCADE) — `@@unique` |
+| `delegadoPorUserId` / `delegadoParaUserId` | INT | FK users |
+| `instrucao` | TEXT NULL | o que foi pedido — registro imutável, não muda se o delegado editar a demanda dele |
+| `prazoRetorno` | DATETIME(3) NULL | quando o delegante espera retorno — independe do prazo da filha |
+| `devolutiva` / `respondidoAt` | TEXT / DATETIME(3) NULL | retorno escrito pelo delegado |
+
+**Por que este desenho:** o app inteiro escopa por `userId` (15+ queries). Visibilidade
+compartilhada exigiria reescrever todas, com risco de vazamento entre usuários. Com
+demanda-filha cada um segue dono do seu registro, nenhuma query mudou, e a cadeia vira
+N níveis de graça — a filha pode ser delegada adiante.
+
+A filha nasce com a **instrução** como descrição e o delegante como `solicitanteUserId`/`solicitanteNome`.
+O checklist da mãe **não** é copiado: copiar criava dois checklists desconectados, e o que o
+delegado marcava não voltava para a mãe. Cada delegação é um pedido específico com resposta
+específica — dividir trabalho entre pessoas = várias delegações, cada uma com sua instrução.
+O histórico **não** é compartilhado: a timeline da filha é exibida na mãe, somente leitura.
+
+⚠️ `carregarDelegacao` em `src/lib/delegacao-db.ts` é o **único ponto do app que lê demanda
+de outro usuário** — sempre através da linha de `delegacoes` e sempre validando `companyId`.
+
+Cancelar a delegação remove a filha, e só é permitido enquanto ela está **intocada**
+(ABERTA, sem comentário não-`STATUS` do delegado, sem ação marcada, sem repasse adiante).
 
 ### Planos atuais
 
@@ -286,6 +318,8 @@ demandoo/
 │   │       │       ├── route.ts       # GET + PATCH (+ auto-log status, focoEncerradoEm) + DELETE
 │   │       │       ├── acoes/         # POST + [acaoId] PATCH/DELETE (aceitam prazo, v1.7)
 │       │       ├── relacoes/      # GET+POST, [relacaoId] DELETE, candidatos (v1.8)
+│       │       ├── delegar/       # POST + [delegacaoId] DELETE (v1.9)
+│       │       ├── devolutiva/    # POST — delegado registra retorno (v1.9)
 │   │       │       ├── calendar.ics/
 │   │       │       ├── comentarios/   # GET + POST + [cId] PATCH/DELETE
 │   │       │       └── relatorio/     # POST (gerar IA) + PATCH (salvar)
@@ -306,6 +340,8 @@ demandoo/
 │       ├── tags.ts                    # parse de #, normalização, sincronização de tags
 │       ├── relacoes.ts                # vínculos: rótulos/opções/tipos (puro, sem prisma)
 │       ├── relacoes-db.ts             # vínculos: carregamento bidirecional
+│       ├── delegacao.ts               # delegação: tipos/rótulos (puro, sem prisma)
+│       ├── delegacao-db.ts            # delegação: leitura da cadeia + membros
 │       └── email.ts                   # Nodemailer + templates
 ```
 
@@ -366,6 +402,9 @@ demandoo/
 | Export PDF via link direto | Não existe API de PDF no browser — usar `window.print()` com `document.title` definido antes. Automação via `?pdf=1` + componente `AutoPrint` |
 | Input de chips perde texto não confirmado | Tag digitada sem Enter/vírgula se perdia ao submeter — `TagInput` confirma a tag pendente no `onBlur`; sugestão usa `onMouseDown`+`preventDefault` p/ não duplicar |
 | Timer JS desacelera em aba de fundo | Pomodoro conta por **timestamp** (`Date.now() - inicio`), nunca somando ticks de `setInterval` |
+| Delegação só no detalhe, nunca na captura | A instrução é obrigatória e não cabe na tela de captura rápida — um seletor de pessoa ali criaria delegação sem pedido, e a API recusaria com 400 |
+| Delegação exige plano de equipe | `maxUsers = 1` (free/basic/complete) bloqueia o convite em `/equipe`, então não há para quem delegar — a v1.9 fica inerte, sem erro aparente. Planos com vaga: `trial` (5), `basic_equipe` (5), `complete_equipe` (20). Convite **pendente** também ocupa vaga |
+| Regra de "intocada" duplicada em leitura e escrita | `cancelavel` (leitura) e o `DELETE` precisam ignorar comentários `STATUS` — a própria delegação cria um. Se divergirem, o botão aparece e a ação é recusada |
 | `@@unique` em par de FKs auto-relacional | Só cobre a direção declarada — (B,A) passa pelo unique de (A,B). Checar os dois sentidos na API antes de criar |
 | Campo de data opcional em body JSON | Validar formato antes de converter — `parseDataOpcionalBRT` devolve `null` para vazio/inválido, evitando `Invalid Date` gravado no banco. `undefined` no body = não mexe no campo; `null` = limpa |
 | `<input type="datetime-local">` e fuso | Retorna string sem timezone — tratar como **BRT** e converter com `parseDateTimeBRT`/`toDateTimeLocalBRT`; nunca `new Date(inputValue)` cru |
@@ -385,6 +424,7 @@ demandoo/
 | **Asaas como gateway de billing** | BR nativo, Pix + boleto + cartão, recorrência nativa, sem câmbio |
 | Pomodoro como widget global (não por demanda) | Foco "livre" que segue entre telas; estado no client (localStorage), zero schema |
 | Ciclo de pomodoro na timeline do Diário (não em `sessoes_foco`) | Não inflar o "Tempo de foco" das demandas; no documento impresso vira seção "Pomodoro" |
+| Delegação por **demanda-filha** em vez de visibilidade compartilhada | O app inteiro escopa por `userId` em 15+ queries; compartilhar visibilidade exigiria reescrever todas, com risco de vazamento. Com demanda-filha nenhuma query mudou, e a cadeia vira N níveis de graça |
 | Vínculo direcional com leitura bidirecional (`demanda_relacoes`) | Uma linha só, sem espelho a manter em sincronia; o `sentido` inverte o rótulo na exibição. Tag agrupa, vínculo dá direção e cadeia |
 | `lib/relacoes.ts` separado de `lib/relacoes-db.ts` | Componente client importa os rótulos; se o módulo importasse prisma, o client acabaria no bundle do browser |
 | Tags relacionais (`tags` + `demanda_tags`) | Autocomplete, contagem e isolamento por empresa; IA sugere tags no pipeline |

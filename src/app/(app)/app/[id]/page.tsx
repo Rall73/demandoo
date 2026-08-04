@@ -8,7 +8,9 @@ import DetalheActions from "./DetalheActions"
 import DetalheContent from "./DetalheContent"
 import AcoesInterativas from "./AcoesInterativas"
 import RelacoesSection from "./RelacoesSection"
+import DelegacaoSection from "./DelegacaoSection"
 import { carregarRelacoes } from "@/lib/relacoes-db"
+import { carregarDelegacao, membrosDelegaveis } from "@/lib/delegacao-db"
 import ComentariosSection, { type ComentarioItem, type AnexoItem } from "./ComentariosSection"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -78,7 +80,16 @@ export default async function DetalhePage({
 
   if (!demanda) notFound()
 
-  const relacoes = await carregarRelacoes(demanda.id, companyId)
+  const [relacoes, delegacao, membros] = await Promise.all([
+    carregarRelacoes(demanda.id, companyId),
+    carregarDelegacao(demanda.id, companyId),
+    membrosDelegaveis(companyId, userId),
+  ])
+
+  const podeDelegar =
+    demanda.tipo !== "DIARIO" &&
+    demanda.status !== "CONCLUIDA" &&
+    demanda.status !== "CANCELADA"
 
   const aiQuota     = session!.user.aiQuota
   const aiUsed      = session!.user.aiUsedTotal
@@ -170,7 +181,6 @@ export default async function DetalhePage({
         descricao={demanda.descricao}
         prioridade={demanda.prioridade}
         prazo={demanda.prazo?.toISOString() ?? null}
-        delegadoNome={demanda.delegadoNome ?? null}
         tags={demanda.tags.map((dt) => dt.tag.nome)}
       />
 
@@ -255,6 +265,15 @@ export default async function DetalhePage({
           feita:     a.feita,
           prazo:     a.prazo?.toISOString() ?? null,
         }))}
+      />
+
+      {/* ── Delegação ───────────────────────────────────────────────────────────── */}
+      <DelegacaoSection
+        demandaId={demanda.id}
+        visao={delegacao}
+        membros={membros}
+        hojeISO={hojeISOBrasil()}
+        podeDelegar={podeDelegar}
       />
 
       {/* ── Demandas vinculadas ─────────────────────────────────────────────────── */}

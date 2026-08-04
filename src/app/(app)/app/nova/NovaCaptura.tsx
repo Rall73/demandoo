@@ -12,6 +12,8 @@ import TagInput from "@/components/TagInput"
 
 type Modo = "voz" | "texto" | "manual"
 type Tipo = "DEMANDA" | "TAREFA" | "IDEIA"
+/** Ação da captura manual: descrição + prazo opcional (YYYY-MM-DD em BRT) */
+type AcaoManual = { descricao: string; prazo: string | null }
 type Prio = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
 
 const TIPO_LABEL: Record<Tipo, string> = {
@@ -62,9 +64,9 @@ export default function NovaCaptura() {
   const [manualPrio,     setManualPrio]     = useState<Prio>("MEDIA")
   const [manualPrazo,    setManualPrazo]    = useState("")
   const [manualSolic,    setManualSolic]    = useState("")
-  const [manualDeleg,    setManualDeleg]    = useState("")
-  const [manualAcoes,    setManualAcoes]    = useState<string[]>([])
+  const [manualAcoes,    setManualAcoes]    = useState<AcaoManual[]>([])
   const [novaAcao,       setNovaAcao]       = useState("")
+  const [novaAcaoPrazo,  setNovaAcaoPrazo]  = useState("")
   const [tagsCaptura,    setTagsCaptura]    = useState<string[]>([])
 
   // ── Estado geral ──────────────────────────────────────────────────────────
@@ -91,9 +93,9 @@ export default function NovaCaptura() {
     setManualPrio("MEDIA")
     setManualPrazo("")
     setManualSolic("")
-    setManualDeleg("")
     setManualAcoes([])
     setNovaAcao("")
+    setNovaAcaoPrazo("")
     setTagsCaptura([])
   }
 
@@ -101,13 +103,19 @@ export default function NovaCaptura() {
   function adicionarAcao() {
     const t = novaAcao.trim()
     if (!t) return
-    setManualAcoes((prev) => [...prev, t])
+    setManualAcoes((prev) => [...prev, { descricao: t, prazo: novaAcaoPrazo || null }])
     setNovaAcao("")
+    setNovaAcaoPrazo("")
     inputAcaoRef.current?.focus()
   }
 
   function removerAcao(idx: number) {
     setManualAcoes((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  function alterarPrazoAcao(idx: number, prazo: string) {
+    setManualAcoes((prev) =>
+      prev.map((a, i) => (i === idx ? { ...a, prazo: prazo || null } : a)))
   }
 
   // ── Gravação de voz ───────────────────────────────────────────────────────
@@ -187,7 +195,6 @@ export default function NovaCaptura() {
             prioridade:      manualPrio,
             prazo:           manualPrazo || null,
             solicitanteNome: manualSolic.trim() || null,
-            delegadoNome:    manualDeleg.trim() || null,
             acoes:           manualAcoes,
             tags:            tagsCaptura,
           }
@@ -200,6 +207,7 @@ export default function NovaCaptura() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+
       router.push(`/app/${data.demanda.id}`)
     } catch (e) {
       setErro(String(e) || "Erro ao criar. Tente novamente.")
@@ -444,36 +452,21 @@ export default function NovaCaptura() {
               </div>
             </div>
 
-            {/* Solicitante + Delegado */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                  Solicitante{" "}
-                  <span className="text-slate-400 font-normal">(opcional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={manualSolic}
-                  onChange={(e) => setManualSolic(e.target.value)}
-                  maxLength={200}
-                  placeholder="Quem pediu…"
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                  Delegado para{" "}
-                  <span className="text-slate-400 font-normal">(opcional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={manualDeleg}
-                  onChange={(e) => setManualDeleg(e.target.value)}
-                  maxLength={200}
-                  placeholder="Quem vai executar…"
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
+            {/* Solicitante — a delegação é feita no detalhe, onde há espaço
+                para escrever a instrução do que está sendo pedido */}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                Solicitante{" "}
+                <span className="text-slate-400 font-normal">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={manualSolic}
+                onChange={(e) => setManualSolic(e.target.value)}
+                maxLength={200}
+                placeholder="Quem pediu…"
+                className="w-full border border-slate-200 rounded-lg px-2.5 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
             </div>
 
             {/* Próximas ações */}
@@ -489,7 +482,14 @@ export default function NovaCaptura() {
                   {manualAcoes.map((a, idx) => (
                     <div key={idx} className="flex items-center gap-2 group">
                       <div className="w-3.5 h-3.5 shrink-0 rounded border border-slate-300 mt-0.5" />
-                      <span className="flex-1 text-sm text-slate-700 leading-snug">{a}</span>
+                      <span className="flex-1 text-sm text-slate-700 leading-snug">{a.descricao}</span>
+                      <input
+                        type="date"
+                        value={a.prazo ?? ""}
+                        onChange={(e) => alterarPrazoAcao(idx, e.target.value)}
+                        title="Prazo da ação (opcional)"
+                        className="shrink-0 border border-slate-200 rounded px-1.5 py-1 text-xs text-gray-800 bg-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                      />
                       <button
                         type="button"
                         onClick={() => removerAcao(idx)}
@@ -516,7 +516,14 @@ export default function NovaCaptura() {
                   }}
                   maxLength={1000}
                   placeholder="Descreva uma ação e pressione Enter…"
-                  className="flex-1 border border-slate-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-300"
+                  className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:text-slate-300"
+                />
+                <input
+                  type="date"
+                  value={novaAcaoPrazo}
+                  onChange={(e) => setNovaAcaoPrazo(e.target.value)}
+                  title="Prazo da ação (opcional)"
+                  className="shrink-0 border border-slate-200 rounded-lg px-1.5 py-2 text-xs text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
                 <button
                   type="button"

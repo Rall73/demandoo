@@ -19,7 +19,6 @@ interface Props {
   descricao:    string | null
   prioridade:   Prio
   prazo:        string | null  // ISO string ou null
-  delegadoNome: string | null
   tags:         string[]
 }
 
@@ -45,7 +44,7 @@ function isoToDate(iso: string | null): string {
 export default function DetalheContent({
   demandaId, tipo: tipoInit, titulo: tituloInit,
   descricao: descInit, prioridade: prioInit, prazo: prazoInit,
-  delegadoNome: delegadoInit, tags: tagsInit,
+  tags: tagsInit,
 }: Props) {
   const router = useRouter()
 
@@ -66,7 +65,6 @@ export default function DetalheContent({
   const [tmpDesc,   setTmpDesc]   = useState(descInit ?? "")
   const [tmpPrio,      setTmpPrio]      = useState<Prio>(prioInit)
   const [tmpPrazo,     setTmpPrazo]     = useState(isoToDate(prazoInit))
-  const [tmpDelegado,  setTmpDelegado]  = useState(delegadoInit ?? "")
   const [tmpTags,      setTmpTags]      = useState<string[]>(tagsInit)
 
   const [loading, setLoading] = useState(false)
@@ -116,14 +114,13 @@ export default function DetalheContent({
     await patch({ tipo: novoTipo })
   }
 
-  // ── Detalhes (tipo + prioridade + prazo + delegado) ─────────────────────────
+  // ── Detalhes (tipo + prioridade + prazo) ────────────────────────────────────
   async function saveDetalhes() {
     setTags(tmpTags)
     await patch({
       tipo:         tipo,  // tipo já atualizado pelo dropdown ou mantido
       prioridade:   tmpPrio,
       prazo:        tmpPrazo || null,
-      delegadoNome: tmpDelegado.trim() || null,
       tags:         tmpTags,
     })
     setShowDetalhes(false)
@@ -322,18 +319,6 @@ export default function DetalheContent({
               </div>
             </div>
 
-            {/* Delegado */}
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Delegado para</label>
-              <input
-                type="text"
-                value={tmpDelegado}
-                onChange={(e) => setTmpDelegado(e.target.value)}
-                placeholder="Nome de quem vai executar…"
-                maxLength={200}
-                className="w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-              />
-            </div>
 
             {/* Tags */}
             <div>
