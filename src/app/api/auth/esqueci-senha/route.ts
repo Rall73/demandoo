@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendPasswordResetEmail, sendDefinePasswordEmail } from "@/lib/email"
+import { ipDaRequisicao, permitirPorIp, segundosParaLiberar } from "@/lib/rate-limit"
 import crypto from "crypto"
 
 export async function POST(req: Request) {
   try {
+    // Este endpoint dispara e-mail para qualquer endereço informado. Sem limite,
+    // vira ferramenta de bombardeio contra terceiros — e queima a reputação do
+    // SMTP do domínio, derrubando os e-mails legítimos junto.
+    const ip    = ipDaRequisicao(req)
+    const chave = `esqueci-senha:${ip}`
+    if (!permitirPorIp(ip, "esqueci-senha", 5, 60 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "Muitas tentativas. Aguarde alguns minutos e tente de novo." },
+        { status: 429, headers: { "Retry-After": String(segundosParaLiberar(chave)) } },
+      )
+    }
+
     const { email } = await req.json()
 
     if (!email || !email.includes("@")) {

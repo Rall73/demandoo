@@ -2,7 +2,7 @@
 
 > Leia este arquivo antes de planejar qualquer feature.
 > Para o estado atual e backlog, ver `_docs/PIPELINE.md`.
-> Última atualização: 2026-08-03 (v1.9.1)
+> Última atualização: 2026-08-04 (v1.10)
 
 ---
 
@@ -342,6 +342,8 @@ demandoo/
 │       ├── relacoes-db.ts             # vínculos: carregamento bidirecional
 │       ├── delegacao.ts               # delegação: tipos/rótulos (puro, sem prisma)
 │       ├── delegacao-db.ts            # delegação: leitura da cadeia + membros
+│       ├── rate-limit.ts              # janela por IP, em memória (corta rajada)
+│       ├── faxina-contas.ts           # remove contas nunca verificadas (+30 dias)
 │       └── email.ts                   # Nodemailer + templates
 ```
 
@@ -402,6 +404,9 @@ demandoo/
 | Export PDF via link direto | Não existe API de PDF no browser — usar `window.print()` com `document.title` definido antes. Automação via `?pdf=1` + componente `AutoPrint` |
 | Input de chips perde texto não confirmado | Tag digitada sem Enter/vírgula se perdia ao submeter — `TagInput` confirma a tag pendente no `onBlur`; sugestão usa `onMouseDown`+`preventDefault` p/ não duplicar |
 | Timer JS desacelera em aba de fundo | Pomodoro conta por **timestamp** (`Date.now() - inicio`), nunca somando ticks de `setInterval` |
+| Conta sem `emailVerified` não faz login | O `authorize()` barra, e Google/convite já nascem verificados. Logo conta não verificada tem **zero dados** — é o que torna a faxina segura. Mas também trancava para fora quem perdia as 24h do link: por isso existe `/api/auth/reenviar-verificacao` |
+| Ordem das checagens no `authorize()` | Senha primeiro, avisos de estado depois. Na ordem inversa, o erro `EMAIL_NOT_VERIFIED` revelava a existência da conta para qualquer senha |
+| JWT só lia o banco no login | Sessão dura 30 dias: trocar empresa/papel/plano não chegava a quem estava logado. Desde a v1.10 o `jwt` callback revalida a cada 5 min via `token.validadoEm` |
 | Delegação só no detalhe, nunca na captura | A instrução é obrigatória e não cabe na tela de captura rápida — um seletor de pessoa ali criaria delegação sem pedido, e a API recusaria com 400 |
 | Delegação exige plano de equipe | `maxUsers = 1` (free/basic/complete) bloqueia o convite em `/equipe`, então não há para quem delegar — a v1.9 fica inerte, sem erro aparente. Planos com vaga: `trial` (5), `basic_equipe` (5), `complete_equipe` (20). Convite **pendente** também ocupa vaga |
 | Regra de "intocada" duplicada em leitura e escrita | `cancelavel` (leitura) e o `DELETE` precisam ignorar comentários `STATUS` — a própria delegação cria um. Se divergirem, o botão aparece e a ação é recusada |

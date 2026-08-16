@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendLembreteEmail } from "@/lib/email"
 import { hojeNoBrasil } from "@/lib/date"
+import { faxinaContasNaoVerificadas } from "@/lib/faxina-contas"
 
 /**
  * GET /api/cron/lembretes
@@ -110,6 +111,26 @@ export async function GET(req: Request) {
     }
   }
 
+  // ── Faxina de contas nunca verificadas ──────────────────────────────────────
+  // Vai de carona neste job em vez de virar um agendamento novo no cron-job.org:
+  // a Hostinger já limita processos, e um terceiro disparo diário é custo evitável.
+  let faxina = null
+  try {
+    faxina = await faxinaContasNaoVerificadas()
+    await prisma.cronExecucao.create({
+      data: {
+        job:      "faxina",
+        enviados: faxina.removidas,
+        erros:    0,
+        detalhes: faxina.detalhes,
+      },
+    })
+    console.log(`[cron/faxina] ${faxina.detalhes}`)
+  } catch (err) {
+    console.error("[cron/faxina] falhou:", err)
+    erros.push(`faxina: ${String(err)}`)
+  }
+
   // ── Registra execução no banco ──────────────────────────────────────────────
   await prisma.cronExecucao.create({
     data: {
@@ -130,6 +151,7 @@ export async function GET(req: Request) {
     d0:              demandasHoje.length,
     d1:              demandasAmanha.length,
     erros:           erros.length > 0 ? erros : undefined,
+    faxina:          faxina ?? undefined,
     executadoEm:     agora.toISOString(),
   })
 }

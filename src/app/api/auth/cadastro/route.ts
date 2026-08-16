@@ -1,12 +1,32 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendVerificationEmail } from "@/lib/email"
+import { ipDaRequisicao, permitirPorIp, segundosParaLiberar } from "@/lib/rate-limit"
 import bcrypt from "bcryptjs"
 import crypto from "crypto"
 
 export async function POST(req: Request) {
   try {
-    const { name, email, password, lgpdConsent, companyName } = await req.json()
+    const ip    = ipDaRequisicao(req)
+    const chave = `cadastro:${ip}`
+    // 5 cadastros por hora por IP. Um escritório atrás de um NAT só pode ter
+    // várias pessoas se cadastrando no mesmo dia; bot tenta em série.
+    if (!permitirPorIp(ip, "cadastro", 5, 60 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "Muitas tentativas. Aguarde alguns minutos e tente de novo." },
+        { status: 429, headers: { "Retry-After": String(segundosParaLiberar(chave)) } },
+      )
+    }
+
+    const { name, email, password, lgpdConsent, companyName, website } = await req.json()
+
+    // Honeypot: `website` é um campo escondido no formulário. Humano nunca vê,
+    // logo nunca preenche; bot que preenche tudo se entrega. Respondemos como
+    // se tivesse dado certo — sem criar nada — para não ensinar o bot a desviar.
+    if (typeof website === "string" && website.trim() !== "") {
+      console.warn("[cadastro] honeypot acionado", { ip })
+      return NextResponse.json({ ok: true, message: "Verifique seu e-mail para ativar a conta." })
+    }
 
     // Validações básicas
     if (!name || !email || !password || !lgpdConsent) {

@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-08-03 (v1.9.1)
+> **Última atualização:** 2026-08-04 (v1.10)
 
 ---
 
@@ -301,6 +301,7 @@ CREATE TABLE `demanda_relacoes` (
 | `/api/auth/cadastro` | POST | ✅ |
 | `/api/auth/esqueci-senha` | POST | ✅ |
 | `/api/auth/nova-senha` | POST | ✅ |
+| `/api/auth/reenviar-verificacao` | POST (rate limit 3/h por IP) | ✅ |
 | `/api/auth/aceitar-convite` | POST | ✅ |
 | `/api/configuracoes/perfil` | PATCH | ✅ |
 | `/api/configuracoes/email` | POST | ✅ |
@@ -563,6 +564,57 @@ SQL em `_docs/sql-delegacao.sql` — rodado em dev + prod em 2026-08-03.
 > **Fora do escopo (vai para a v1.10):** abas Delegadas/Recebidas no Quadro de Foco e
 > e-mails de "nova demanda delegada" / "retorno registrado".
 
+### ✅ 4.28 Higiene de contas e defesas de autenticação (v1.10)
+
+Nasceu de três cadastros automatizados encontrados em produção (ids 16/17/18).
+A investigação mostrou que **não houve invasão** — a trava de verificação de e-mail
+segurou, e as contas ficaram com zero dados. Mas expôs um problema pior: quem
+perdia a validade de 24h do link de verificação ficava **trancado para fora sem
+autoatendimento** (caso real: o Gabriel, id 15, destravado por SQL).
+**Sem mudança de schema.**
+
+| Item | Status |
+|---|---|
+| `POST /api/auth/reenviar-verificacao` — o caminho de volta que não existia | ✅ |
+| Botão "Reenviar e-mail de confirmação" no login, só quando o erro é esse | ✅ |
+| `nova-senha` passa a gravar `emailVerified` (mesma régua do `aceitar-convite`) | ✅ |
+| `src/lib/rate-limit.ts` — janela deslizante por IP, em memória | ✅ |
+| Rate limit: cadastro 5/h, esqueci-senha 5/h, reenviar-verificação 3/h | ✅ |
+| **Falha aberto** sem IP identificável — nunca barra por não saber a origem | ✅ |
+| `console.warn` em cada bloqueio, com rota e IP — revela IP de proxy em produção | ✅ |
+| Honeypot (`website`) no cadastro — responde sucesso e não cria nada | ✅ |
+| `src/lib/faxina-contas.ts` — remove contas não verificadas com +30 dias | ✅ |
+| Faxina roda de carona no cron `lembretes`, log próprio em `cron_execucoes` | ✅ |
+| **Faxina em modo ENSAIO** (`ARMADA = false`) — só apura e registra | ⚠️ |
+| Login: senha conferida **antes** dos avisos de estado da conta | ✅ |
+| JWT revalida contra o banco a cada 5 min (`token.validadoEm`) | ✅ |
+
+> **Enumeração de usuários corrigida:** o `EMAIL_NOT_VERIFIED` era lançado antes do
+> `bcrypt.compare`, então qualquer senha revelava se o e-mail tinha conta. Agora a
+> senha é validada primeiro; avisos específicos só depois de provada a posse.
+
+> **JWT parado no tempo:** o token só lia o banco no login e a sessão dura 30 dias —
+> mudança de empresa, papel ou plano não chegava a quem estava logado. Foi o que
+> obrigou os 8 usuários da consolidação a refazer login. Agora se resolve sozinho.
+
+> **Limite consciente do rate limit:** o estado vive no processo. Reinício zera, e
+> múltiplos processos do Passenger contam separado. Serve para cortar rajada, que é
+> o caso que machuca; controle rígido exigiria tabela ou Redis.
+
+> **Armadilha encontrada no teste:** a 1ª versão devolvia `"desconhecido"` quando não
+> achava o IP — todos cairiam no mesmo balde e o limite valeria para o **app inteiro**,
+> uma negação de serviço auto-infligida. Agora devolve `null` e a função libera.
+> Descoberto também que **o Next.js injeta `x-forwarded-for: ::1` em dev**, então todo
+> request local divide o mesmo balde — atrapalha teste, não produção.
+
+> ⚠️ **A conferir em produção:** se o proxy da Hostinger **sobrescrever** o
+> `x-forwarded-for` em vez de preservar, o IP detectado será o do proxy e todos
+> voltam ao balde único. O `console.warn` de bloqueio existe para isso: bloqueios
+> legítimos sempre com o mesmo IP são o sintoma. Nesse caso, afrouxar o limite.
+
+> **Verificado localmente:** honeypot devolve sucesso sem criar usuário nem token;
+> 4ª tentativa de cadastro no mesmo IP retorna 429 com `Retry-After: 3600`.
+
 ### ✅ 4.16 Páginas Públicas
 
 | Página | Status |
@@ -615,7 +667,7 @@ para não desestruturar o que já funciona.
 
 #### ~~v1.9 — Delegação em cadeia (núcleo)~~ ✅ entregue em 2026-08-03 (ver 4.27)
 
-#### v1.10 — Delegação: Foco e notificações
+#### v1.11 — Delegação: Foco e notificações
 
 Resto da delegação, fatiado a pedido do Ricardo para testar o núcleo antes de
 mexer no Quadro de Foco, que é tela de uso diário.
@@ -759,6 +811,7 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 | 2026-08-02 | v1.6 | Resumo do mês: fechamento mensal em `/app/resumo` com movimento por tipo, prazos, tempo de foco, Diário, tags e comparativo com o mês anterior; impressão, PDF e Word. Sem mudança de schema |
 | 2026-08-02 | v1.7 | Prazo nas ações: API aceita `prazo`, definição inline no checklist do detalhe, badge por situação (vencida/hoje/futura) e contador de vencidas; acende o painel "Ações de hoje" do Diário, onde a ação cumprida permanece marcada em vez de sumir. Sem mudança de schema |
 | 2026-08-03 | v1.9 | Delegação em cadeia (núcleo): tabela `delegacoes`, desenho demanda-filha, painel de delegação nos três papéis, devolutiva, cancelamento só se intocada; campo "Delegado" vira seletor de membros |
+| 2026-08-04 | v1.10 | Higiene de contas: reenvio de verificação, `nova-senha` verificando e-mail, rate limit por IP, honeypot no cadastro, faxina de não verificados (em ensaio), ordem das checagens no login e revalidação periódica do JWT |
 | 2026-08-03 | v1.9.1 | Delegação passa a carregar **instrução** em vez de copiar o checklist da mãe (evita dois checklists desconectados); instrução obrigatória e registrada de forma imutável em `delegacoes.instrucao`. Captura: delegação removida da tela (não havia onde escrever a instrução) e prazo por ação adicionado |
 | 2026-08-02 | v1.8 | Vínculo direto entre demandas: tabela `demanda_relacoes`, leitura bidirecional, seção "Demandas vinculadas" no detalhe com autocomplete e 5 naturezas de vínculo |
 

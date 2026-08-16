@@ -10,6 +10,8 @@ export default function CadastroPage() {
   const [email,         setEmail]         = useState("")
   const [password,      setPassword]      = useState("")
   const [lgpdConsent,   setLgpdConsent]   = useState(false)
+  // Honeypot: fica escondido, humano nunca preenche. Ver /api/auth/cadastro.
+  const [website,       setWebsite]       = useState("")
   const [loading,       setLoading]       = useState(false)
   const [loadingGoogle, setLoadingGoogle] = useState(false)
   const [error,         setError]         = useState<string | null>(null)
@@ -33,7 +35,7 @@ export default function CadastroPage() {
     const res = await fetch("/api/auth/cadastro", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ name, email, password, lgpdConsent }),
+      body:    JSON.stringify({ name, email, password, lgpdConsent, website }),
     })
 
     const data = await res.json().catch(() => ({}))
@@ -114,6 +116,22 @@ export default function CadastroPage() {
           </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Honeypot — invisível e fora da ordem de tabulação. Não usar
+              display:none: parte dos bots ignora campo assim. */}
+          <div aria-hidden="true" className="absolute left-[-9999px] top-auto w-px h-px overflow-hidden">
+            <label htmlFor="website">Não preencha este campo</label>
+            <input
+              id="website"
+              name="website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
+          </div>
+
           <div className="sr-only">{/* form fields below */}</div>
 
           <div>

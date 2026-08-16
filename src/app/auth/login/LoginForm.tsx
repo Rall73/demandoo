@@ -10,8 +10,10 @@ export default function LoginForm() {
   const searchParams = useSearchParams()
   const callbackUrl  = searchParams.get("callbackUrl") ?? "/app"
 
-  // Auth.js v5 redireciona para ?error=... em vez de retornar no redirect:false
-  const errorParam   = searchParams.get("error")
+  // Auth.js v5 redireciona para ?error=... em vez de retornar no redirect:false.
+  // Erros de CredentialsSignin chegam com o motivo no parâmetro `code`, e o
+  // `error` fica genérico ("CredentialsSignin") — por isso o code tem prioridade.
+  const errorParam   = searchParams.get("code") ?? searchParams.get("error")
   const conviteParam = searchParams.get("convite")
 
   const AUTH_ERRORS: Record<string, string> = {
@@ -30,6 +32,32 @@ export default function LoginForm() {
   const [error,      setError]      = useState<string | null>(
     errorParam ? (AUTH_ERRORS[errorParam] ?? "Erro ao entrar. Tente novamente.") : null
   )
+
+  // Reenvio de verificação: só aparece quando o motivo do bloqueio é esse.
+  // Antes, quem perdia a validade do link de 24h não tinha saída nenhuma.
+  const naoVerificado = errorParam === "EMAIL_NOT_VERIFIED"
+  const [reenviando, setReenviando] = useState(false)
+  const [reenviado,  setReenviado]  = useState(false)
+
+  async function reenviarVerificacao() {
+    if (!email.trim()) {
+      setError("Informe o e-mail acima para receber um novo link.")
+      return
+    }
+    setReenviando(true)
+    const res = await fetch("/api/auth/reenviar-verificacao", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ email }),
+    })
+    setReenviando(false)
+    if (res.status === 429) {
+      const d = await res.json()
+      setError(d.error ?? "Muitas tentativas. Tente mais tarde.")
+      return
+    }
+    setReenviado(true)
+  }
 
   async function handleGoogle() {
     setLoadingGoogle(true)
@@ -71,6 +99,23 @@ export default function LoginForm() {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
               {error}
+              {naoVerificado && !reenviado && (
+                <button
+                  type="button"
+                  onClick={reenviarVerificacao}
+                  disabled={reenviando}
+                  className="block mt-2 font-medium underline hover:no-underline disabled:opacity-60"
+                >
+                  {reenviando ? "Enviando…" : "Reenviar e-mail de confirmação"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {reenviado && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg px-4 py-3">
+              Se houver uma conta pendente com esse e-mail, enviamos um novo link de confirmação.
+              Ele vale 24 horas.
             </div>
           )}
 

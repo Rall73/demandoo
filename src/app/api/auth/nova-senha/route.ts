@@ -30,7 +30,10 @@ export async function POST(req: Request) {
     await prisma.$transaction([
       prisma.user.update({
         where: { email },
-        data:  { passwordHash },
+        // emailVerified junto: clicar num link enviado para o endereço já prova
+        // posse dele — mesma régua que o aceitar-convite usa. Sem isso, quem
+        // perdeu a verificação redefinia a senha e continuava barrado no login.
+        data:  { passwordHash, emailVerified: new Date() },
       }),
       prisma.verificationToken.delete({ where: { token } }),
     ])

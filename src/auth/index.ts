@@ -1,9 +1,24 @@
-import NextAuth from "next-auth"
+import NextAuth, { CredentialsSignin } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+
+/**
+ * Erros de login que a tela precisa distinguir.
+ *
+ * `throw new Error("X")` cru NÃO funciona aqui: o Auth.js v5 embrulha qualquer
+ * exceção do `authorize()` num CallbackRouteError e a URL vira `?error=Configuration`,
+ * perdendo o motivo. Só `CredentialsSignin` propaga o `code` para a URL —
+ * e ele chega no parâmetro `code`, não em `error`.
+ *
+ * Expor o motivo é seguro porque a senha já foi conferida antes destes erros:
+ * quem chega aqui provou a posse da conta.
+ */
+class EmailNaoVerificado extends CredentialsSignin { code = "EMAIL_NOT_VERIFIED" }
+class ContaInativa      extends CredentialsSignin { code = "ACCOUNT_INACTIVE" }
+class EmpresaSuspensa   extends CredentialsSignin { code = "COMPANY_SUSPENDED" }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter:   PrismaAdapter(prisma),
@@ -37,12 +52,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })
 
         if (!user || !user.passwordHash) return null
-        if (!user.emailVerified) throw new Error("EMAIL_NOT_VERIFIED")
-        if (!user.active || user.deletedAt) throw new Error("ACCOUNT_INACTIVE")
-        if (!user.company.active) throw new Error("COMPANY_SUSPENDED")
 
+        // A senha é conferida ANTES de qualquer aviso sobre o estado da conta.
+        // Na ordem inversa, uma senha errada qualquer já revelava se o e-mail
+        // tem conta aqui — enumeração de usuários de graça.
         const valid = await bcrypt.compare(String(credentials.password), user.passwordHash)
         if (!valid) return null
+
+        // Daqui para baixo a posse da senha está provada: os avisos específicos
+        // são úteis para o dono da conta e não entregam nada a estranho.
+        if (!user.emailVerified) throw new EmailNaoVerificado()
+        if (!user.active || user.deletedAt) throw new ContaInativa()
+        if (!user.company.active) throw new EmpresaSuspensa()
 
         return {
           id:          String(user.id),
@@ -114,8 +135,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return { ...token, ...updateData }
       }
 
-      // Na primeira autenticação, `user` ou `account` vêm populados
-      if (user || account) {
+      const primeiroLogin = Boolean(user || account)
+
+      // O token guardava os dados do login e nunca mais olhava o banco. Resultado:
+      // trocar empresa, papel ou plano não chegava a quem já estava logado — a
+      // pessoa via o app vazio ou com permissão velha até sair e entrar, e a
+      // sessão JWT dura 30 dias. Aqui ele revalida sozinho de tempos em tempos.
+      const REVALIDAR_A_CADA_MS = 5 * 60 * 1000
+      const validadoEm = typeof token.validadoEm === "number" ? token.validadoEm : 0
+      const vencido    = Date.now() - validadoEm > REVALIDAR_A_CADA_MS
+
+      if (primeiroLogin || vencido) {
         const dbUser = await prisma.user.findUnique({
           where:   { email: token.email! },
           include: { company: { include: { plan: true } } },
@@ -131,8 +161,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.aiQuota       = dbUser.company.plan.aiQuota
           token.aiUsedTotal   = dbUser.company.aiUsedTotal
           token.role          = dbUser.role
+          token.validadoEm    = Date.now()
         }
+        // dbUser ausente (conta removida) mantém o token como está: o middleware
+        // segue barrando pelas checagens de rota, e derrubar aqui exigiria
+        // tratamento de sessão que o strategy jwt não oferece.
       }
+
       return token
     },
 
