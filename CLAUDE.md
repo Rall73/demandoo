@@ -43,6 +43,15 @@ Consulte antes de planejar qualquer feature:
 - Sem segredos no repo — tudo nas env vars do painel Hostinger
 - Nunca `output: 'standalone'` no next.config — quebra o Passenger
 
+### Autenticação (Auth.js v5)
+- Erro do `authorize()` só chega à tela via `CredentialsSignin` — `throw new Error()` cru
+  vira `?error=Configuration` e perde o motivo. O código chega no parâmetro `code`
+- Conferir a **senha antes** de qualquer aviso sobre o estado da conta (senão vaza
+  a existência do e-mail para qualquer senha)
+- Sessão é JWT: não há registro no servidor, a tabela `sessions` está sem uso.
+  Derrubar todo mundo = trocar `AUTH_SECRET`
+- Conta sem `emailVerified` não faz login — logo não tem dado nenhum
+
 ### Middleware
 - Arquivo obrigatoriamente em `src/middleware.ts` — qualquer outro nome é ignorado pelo Next.js
 - Build correto exibe `ƒ Proxy (Middleware)` no output

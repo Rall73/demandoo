@@ -52,10 +52,13 @@ plans
   └── companies (tenant)
         └── users
               └── demandas
-              │     ├── acoes_demanda
+              │     ├── acoes_demanda          (prazo por ação — v1.7)
               │     ├── comentarios
               │     ├── anexos
-              │     └── demanda_tags ──→ tags
+              │     ├── sessoes_foco
+              │     ├── demanda_tags ──→ tags
+              │     ├── demanda_relacoes       (demanda ↔ demanda — v1.8)
+              │     └── delegacoes             (mãe ↔ filha, entre usuários — v1.9)
               └── listas
                     └── itens_lista
 accounts / sessions / verification_tokens  (Auth.js)
@@ -93,16 +96,25 @@ cron_execucoes
 
 | id | slug | name | priceCents | aiQuota | maxUsers | Tipo |
 |---|---|---|---|---|---|---|
-| 1 | `free` | Gratuito | 0 | 20 | 1 | Individual |
-| 2 | `pro` | Profissional | 1990 | NULL | 1 | Legado |
-| 3 | `team` | Equipe | 4990 | NULL | 5 | Legado |
+| 1 | `free` | Gratuito | 0 | **500** ⚠️ | 1 | Individual |
+| 2 | `pro` | Profissional | 1990 | NULL (ilimitada) | 1 | Legado |
+| 3 | `team` | Equipe | 4990 | NULL (ilimitada) | 5 | Legado |
 | 4 | `trial` | Trial | 0 | 100 | 5 | Especial |
-| 5 | `basic` | Básico | placeholder | 200 | 1 | Individual |
-| 6 | `complete` | Completo | placeholder | 500 | 1 | Individual |
+| 5 | `basic` | Básico | 4900 | 200 | 1 | Individual |
+| 6 | `complete` | Completo | 9900 | 500 | 1 | Individual |
 | 7 | `basic_equipe` | Básico Equipe | 14900 | 500 | 5 | Equipe |
 | 8 | `complete_equipe` | Completo Equipe | 29900 | 1500 | 20 | Equipe |
+| 9 | `cortesia` | Cortesia | 0 | NULL (ilimitada) | 100 | Cortesia (v1.10) |
 
-> Preços `basic`/`complete` são placeholders — ajustar via phpMyAdmin quando billing for definido.
+> ⚠️ `free.aiQuota` está em **500**, não 20: aumento temporário do beta (2026-05-28).
+> Reverter antes do billing — é o que segura o custo de OpenAI se alguém entrar por
+> conta Google descartável, já que esse caminho pula a verificação de e-mail.
+
+> `aiQuota = NULL` significa **IA ilimitada**: o código só bloqueia quando o valor
+> não é nulo. `maxUsers` é NOT NULL, então "ilimitado" vira um número alto (100).
+
+> O plano `cortesia` foi criado em 2026-08-04 para a Viracopos — liberação de teste
+> real, não plano comercial. Editar preço/quota pelo `/admin/planos`.
 
 ### SQLs históricos (referência — já rodados em dev + prod)
 
@@ -156,7 +168,48 @@ CREATE TABLE `demanda_relacoes` (
   CONSTRAINT `fk_drel_origem`  FOREIGN KEY (`demandaOrigemId`)  REFERENCES `demandas`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_drel_destino` FOREIGN KEY (`demandaDestinoId`) REFERENCES `demandas`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- v1.9 — delegação em cadeia (cópia em _docs/sql-delegacao.sql)
+CREATE TABLE `delegacoes` (
+  `id` INT NOT NULL AUTO_INCREMENT, `companyId` INT NOT NULL,
+  `demandaOrigemId` INT NOT NULL, `demandaFilhaId` INT NOT NULL,
+  `delegadoPorUserId` INT NOT NULL, `delegadoParaUserId` INT NOT NULL,
+  `prazoRetorno` DATETIME(3) NULL, `devolutiva` TEXT NULL, `respondidoAt` DATETIME(3) NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`), UNIQUE KEY `uq_delegacao_filha` (`demandaFilhaId`),
+  INDEX `idx_deleg_origem` (`demandaOrigemId`), INDEX `idx_deleg_company` (`companyId`),
+  INDEX `idx_deleg_para` (`delegadoParaUserId`),
+  CONSTRAINT `fk_deleg_origem` FOREIGN KEY (`demandaOrigemId`) REFERENCES `demandas`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_deleg_filha`  FOREIGN KEY (`demandaFilhaId`)  REFERENCES `demandas`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_deleg_por`    FOREIGN KEY (`delegadoPorUserId`)  REFERENCES `users`(`id`),
+  CONSTRAINT `fk_deleg_para`   FOREIGN KEY (`delegadoParaUserId`) REFERENCES `users`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- v1.9.1 — instrução da delegação (cópia em _docs/sql-delegacao-instrucao.sql)
+ALTER TABLE `delegacoes` ADD COLUMN `instrucao` TEXT NULL AFTER `delegadoParaUserId`;
+
+-- v1.10 — plano de cortesia (criado pelo script de consolidação)
+INSERT IGNORE INTO plans (slug, name, priceCents, aiQuota, maxUsers, active)
+VALUES ('cortesia', 'Cortesia', 0, NULL, 100, 1);
 ```
+
+### Migrações operacionais de produção (2026-08-04)
+
+Não são mudanças de schema — são movimentações de dado feitas uma vez, guardadas
+como histórico do que foi executado:
+
+| Arquivo | O que fez |
+|---|---|
+| `_docs/sql-diagnostico-consolidacao.sql` | levantamento somente leitura, antes de tudo |
+| `_docs/sql-diagnostico-2.sql` | vínculos Google, volume por empresa, colisão de tags |
+| `_docs/sql-troca-emails.sql` | inverte os e-mails das contas #1 e #8 e move o vínculo Google junto |
+| `_docs/sql-consolidacao-viracopos.sql` | traz 8 usuários para a empresa 1, com fusão de tags |
+
+> **Lição que vale para a próxima migração:** entregar sempre com o `COMMIT`
+> comentado. O phpMyAdmin desfaz a transação ao fechar a conexão, o que transforma
+> a primeira execução em ensaio sem risco. Salvou duas vezes: uma pegou a fusão de
+> tags incompleta (colisão entre duas origens, não só com o destino), outra mostrou
+> que nada tinha sido gravado quando parecia que sim.
 
 ---
 
@@ -739,7 +792,8 @@ criar demanda nova por cron — esta última polui dashboard e resumo mensal com
 
 | Item | Prioridade |
 |---|---|
-| E-mail: nova demanda delegada | 🟡 |
+| E-mail: nova demanda delegada | 🔴 — movido para a v1.11 |
+| E-mail: retorno da delegação registrado | 🔴 — movido para a v1.11 |
 | E-mail: demanda concluída (para solicitante) | 🟡 |
 | Notificações in-app (badge sidebar) | 🟡 |
 
@@ -747,13 +801,15 @@ criar demanda nova por cron — esta última polui dashboard e resumo mensal com
 
 | Item | Prioridade |
 |---|---|
-| Delegação vinculada a `userId` (hoje texto livre) | 🟡 |
 | Paginação nas listagens (hoje limit 100/200) | 🟡 |
 | Export CSV da lista com filtros aplicados | 🟡 |
 | Ações com prazo aparecerem no Calendário (hoje só demandas) | 🟡 |
 | Vínculos entre demandas na impressão e no relatório IA | 🟡 |
 | Drag & drop para reordenar ações | 🟢 |
 | Busca global (Ctrl+K) — incluir filtro por tag server-side | 🟢 |
+| Tela para o ADMIN renomear a empresa (hoje só por SQL) | 🟡 |
+| Cadastro via Google perguntar o nome da empresa | 🟡 |
+| Contador de uso da tag filtrado por usuário, para bater com a busca | 🟢 |
 | Seletor de tags dedicado na barra de filtros da lista (hoje: clique no chip ou busca) | 🟢 |
 
 ### 🔲 6.5 Indicador Pessoal / Trabalho (em avaliação)
@@ -782,9 +838,16 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 
 | Item | Impacto |
 |---|---|
-| `delegadoNome` ainda é texto livre | 🟡 Médio — não vincula ao `users.id` |
-| Queries sem paginação (take: 100/200) | 🟡 Médio — OK para MVP |
+| Rate limit em memória — reinício zera, processos do Passenger contam separado | 🟡 Médio — corta rajada, não é controle rígido |
+| Faxina de contas ainda **desarmada** (`ARMADA = false`) | 🟡 Médio — decisão pendente após ler o log |
+| `free.aiQuota = 500` (beta) — reverter antes do billing | 🟡 Médio — exposição de custo OpenAI |
+| Queries sem paginação (take: 100/200) | 🟡 Médio — OK para o volume atual |
+| Cadastro via Google não pergunta nome da empresa | 🟡 Médio — tenant nasce com o nome da pessoa; sem tela para renomear |
+| Contador de uso da tag é da empresa, mas a busca é do usuário | 🟢 Baixo — número não bate com o resultado |
 | `new Date()` cru em `DetalheActions.tsx` (só para log client) | 🟢 Baixo |
+
+> **Resolvidos:** `delegadoNome` como texto livre (v1.9, virou `delegadoUserId` real);
+> ações sem prazo (v1.7); JWT sem revalidação (v1.10).
 
 ---
 

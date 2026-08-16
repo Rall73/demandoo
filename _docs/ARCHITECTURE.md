@@ -17,6 +17,11 @@
 
 **Multi-tenant:** cada empresa (`Company`) tem seu ambiente isolado. Convites e equipe via `/equipe`.
 
+⚠️ **O cadastro cria uma empresa com o nome da pessoa** — quem entra sozinho vira um tenant
+de um usuário só. Foi o que aconteceu na Viracopos, consolidada manualmente em 2026-08-04
+(9 pessoas numa empresa só; ver `_docs/sql-consolidacao-viracopos.sql`). Não existe tela para
+renomear a empresa, e o cadastro via Google nem pergunta o nome — ambos no backlog.
+
 ---
 
 ## 2. Stack
@@ -210,14 +215,23 @@ Cancelar a delegação remove a filha, e só é permitido enquanto ela está **i
 
 | slug | name | priceCents | aiQuota | maxUsers |
 |---|---|---|---|---|
-| `free` | Gratuito | 0 | 20 | 1 |
+| `free` | Gratuito | 0 | **500** ⚠️ | 1 |
 | `trial` | Trial | 0 | 100 | 5 |
-| `basic` | Básico | placeholder | 200 | 1 |
-| `complete` | Completo | placeholder | 500 | 1 |
+| `basic` | Básico | 4900 | 200 | 1 |
+| `complete` | Completo | 9900 | 500 | 1 |
 | `basic_equipe` | Básico Equipe | 14900 | 500 | 5 |
 | `complete_equipe` | Completo Equipe | 29900 | 1500 | 20 |
+| `cortesia` | Cortesia | 0 | NULL | 100 |
 
-> ⚠️ `free.aiQuota = 500` temporariamente (beta, 2026-05-28). Reverter para 20 via phpMyAdmin antes do billing.
+> **`aiQuota = NULL` = IA ilimitada** — o código só bloqueia quando o valor não é nulo
+> (`aiQuota !== null && aiUsed >= aiQuota`). `maxUsers` é NOT NULL, então "ilimitado"
+> vira um número alto. Os legados `pro` e `team` também têm quota nula.
+
+> ⚠️ `free.aiQuota = 500` temporariamente (beta, 2026-05-28). Reverter para 20 antes do
+> billing: é o que limita o custo de OpenAI se alguém entrar com conta Google descartável,
+> caminho que pula a verificação de e-mail.
+
+> `cortesia` (v1.10) é liberação de teste da Viracopos, não plano comercial.
 
 ---
 
@@ -299,7 +313,8 @@ demandoo/
 │   │   │
 │   │   └── api/
 │   │       ├── admin/planos/[id]/
-│   │       ├── auth/                  # cadastro, esqueci-senha, nova-senha, aceitar-convite
+│   │       ├── auth/                  # cadastro, esqueci-senha, nova-senha,
+│   │       │                          # aceitar-convite, reenviar-verificacao (v1.10)
 │   │       ├── configuracoes/         # perfil, email, senha
 │   │       ├── cron/lembretes/        # GET (bearer auth) — D-0 e D-1 demandas
 │   │       ├── cron/lembretes-listas/ # GET (bearer auth) — lembrar N dias antes
@@ -343,7 +358,7 @@ demandoo/
 │       ├── delegacao.ts               # delegação: tipos/rótulos (puro, sem prisma)
 │       ├── delegacao-db.ts            # delegação: leitura da cadeia + membros
 │       ├── rate-limit.ts              # janela por IP, em memória (corta rajada)
-│       ├── faxina-contas.ts           # remove contas nunca verificadas (+30 dias)
+│       ├── faxina-contas.ts           # remove contas nunca verificadas (+30 dias, DESARMADA)
 │       └── email.ts                   # Nodemailer + templates
 ```
 
@@ -368,11 +383,48 @@ demandoo/
 
 ## 8. Autenticação (Auth.js v5)
 
-- **Estratégia:** JWT
-- **Providers:** Credentials + Google OAuth
+- **Estratégia:** JWT — a sessão é um cookie assinado, **não há registro no servidor**.
+  A tabela `sessions` existe (criada pelo PrismaAdapter) mas está sem uso: apagar linha
+  de lá não derruba ninguém. A única invalidação em massa é trocar o `AUTH_SECRET`.
+- **Providers:** Credentials + Google OAuth (`allowDangerousEmailAccountLinking: true`,
+  então uma conta Google nova se vincula sozinha a um e-mail já cadastrado)
 - **`trustHost: true`** — obrigatório na Hostinger (proxy reverso)
-- **JWT payload:** `id, companyId, companyName, planSlug, aiQuota, aiUsedTotal, role, avatarUrl, planExpiresAt`
-- Google OAuth: cria empresa automaticamente no 1º acesso
+- **JWT payload:** `id, companyId, companyName, planSlug, aiQuota, aiUsedTotal, role,
+  avatarUrl, planExpiresAt, validadoEm`
+- Google OAuth: cria empresa automaticamente no 1º acesso, já com `emailVerified`
+
+### Revalidação do token (v1.10)
+
+O `jwt` callback lia o banco **só no login**, e a sessão dura 30 dias — mudança de
+empresa, papel ou plano não chegava a quem já estava logado. Desde a v1.10 ele
+revalida a cada 5 minutos, controlado por `token.validadoEm`.
+
+### Ordem das checagens no `authorize()`
+
+Senha **primeiro**, avisos de estado depois. Na ordem inversa, o `EMAIL_NOT_VERIFIED`
+era lançado antes do `bcrypt.compare` e qualquer senha revelava se o e-mail tinha conta.
+
+### Como propagar erro de login para a tela
+
+`throw new Error("X")` **não funciona**: o Auth.js v5 embrulha exceções do `authorize()`
+num `CallbackRouteError` e a URL vira `?error=Configuration`, perdendo o motivo — foi
+assim durante toda a vida do app, e a mensagem "Confirme seu e-mail" nunca apareceu.
+
+Só `CredentialsSignin` propaga, e o motivo chega no parâmetro **`code`**, não em `error`:
+
+```
+/auth/login?error=CredentialsSignin&code=EMAIL_NOT_VERIFIED
+```
+
+Códigos em uso: `EMAIL_NOT_VERIFIED`, `ACCOUNT_INACTIVE`, `COMPANY_SUSPENDED`.
+
+### Verificação de e-mail
+
+Quatro pontos gravam `emailVerified`: `/auth/verificar` (link do cadastro),
+`/auth/confirmar-email` (troca de e-mail), `aceitar-convite` e o `signIn` do Google.
+Desde a v1.10, **`nova-senha` também** — clicar num link enviado ao endereço prova posse
+dele. Sem isso, quem perdia as 24h do token ficava sem forma de entrar, mesmo com a
+senha certa. O reenvio fica em `POST /api/auth/reenviar-verificacao`.
 
 ---
 
