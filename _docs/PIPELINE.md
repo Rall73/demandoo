@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-08-04 (v1.10)
+> **Última atualização:** 2026-08-04 (v1.10.1)
 
 ---
 
@@ -640,15 +640,32 @@ autoatendimento** (caso real: o Gabriel, id 15, destravado por SQL).
 | Faxina roda de carona no cron `lembretes`, log próprio em `cron_execucoes` | ✅ |
 | **Faxina em modo ENSAIO** (`ARMADA = false`) — só apura e registra | ⚠️ |
 | Login: senha conferida **antes** dos avisos de estado da conta | ✅ |
-| JWT revalida contra o banco a cada 5 min (`token.validadoEm`) | ✅ |
+| ~~JWT revalida contra o banco a cada 5 min~~ | ❌ **REVERTIDO** — ver abaixo |
 
 > **Enumeração de usuários corrigida:** o `EMAIL_NOT_VERIFIED` era lançado antes do
 > `bcrypt.compare`, então qualquer senha revelava se o e-mail tinha conta. Agora a
 > senha é validada primeiro; avisos específicos só depois de provada a posse.
 
-> **JWT parado no tempo:** o token só lia o banco no login e a sessão dura 30 dias —
-> mudança de empresa, papel ou plano não chegava a quem estava logado. Foi o que
-> obrigou os 8 usuários da consolidação a refazer login. Agora se resolve sozinho.
+> 🔴 **INCIDENTE — revalidação do JWT revertida em 2026-08-04 (v1.10.1).**
+> Em produção, usuários começaram a ser deslogados no meio do trabalho, perdendo
+> anotações não salvas.
+>
+> **Causa:** o `middleware.ts` envolve `auth()` com matcher que pega quase toda
+> requisição, e `auth()` executa o `jwt` callback. Colocar consulta ao banco ali
+> significa **consulta ao banco em cada navegação** — e se ela falha (limite de
+> recursos da Hostinger, pool de conexão, timeout), o callback lança, a sessão não
+> resolve e o middleware manda a pessoa para o login.
+>
+> **Amplificador:** tokens emitidos antes da v1.10 não tinham `validadoEm`, então
+> valiam 0 e venceram imediatamente. Todos os usuários logados bateram no banco na
+> primeira requisição após o deploy, ao mesmo tempo.
+>
+> **Consequência aceita:** mudança de empresa, papel ou plano só chega ao usuário no
+> próximo login — quem alterar no banco precisa avisar a pessoa a sair e entrar.
+>
+> **Se um dia for retomado:** não pelo `jwt` callback. O caminho é revalidar em rota
+> de página, fora do middleware, com try/catch, jamais deixando falha de banco
+> derrubar sessão.
 
 > **Limite consciente do rate limit:** o estado vive no processo. Reinício zera, e
 > múltiplos processos do Passenger contam separado. Serve para cortar rajada, que é
@@ -874,6 +891,7 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 | 2026-08-02 | v1.6 | Resumo do mês: fechamento mensal em `/app/resumo` com movimento por tipo, prazos, tempo de foco, Diário, tags e comparativo com o mês anterior; impressão, PDF e Word. Sem mudança de schema |
 | 2026-08-02 | v1.7 | Prazo nas ações: API aceita `prazo`, definição inline no checklist do detalhe, badge por situação (vencida/hoje/futura) e contador de vencidas; acende o painel "Ações de hoje" do Diário, onde a ação cumprida permanece marcada em vez de sumir. Sem mudança de schema |
 | 2026-08-03 | v1.9 | Delegação em cadeia (núcleo): tabela `delegacoes`, desenho demanda-filha, painel de delegação nos três papéis, devolutiva, cancelamento só se intocada; campo "Delegado" vira seletor de membros |
+| 2026-08-04 | v1.10.1 | **Revert** da revalidação periódica do JWT: derrubava sessão em produção quando a consulta ao banco falhava dentro do middleware, com perda de trabalho do usuário |
 | 2026-08-04 | v1.10 | Higiene de contas: reenvio de verificação, `nova-senha` verificando e-mail, rate limit por IP, honeypot no cadastro, faxina de não verificados (em ensaio), ordem das checagens no login e revalidação periódica do JWT |
 | 2026-08-03 | v1.9.1 | Delegação passa a carregar **instrução** em vez de copiar o checklist da mãe (evita dois checklists desconectados); instrução obrigatória e registrada de forma imutável em `delegacoes.instrucao`. Captura: delegação removida da tela (não havia onde escrever a instrução) e prazo por ação adicionado |
 | 2026-08-02 | v1.8 | Vínculo direto entre demandas: tabela `demanda_relacoes`, leitura bidirecional, seção "Demandas vinculadas" no detalhe com autocomplete e 5 naturezas de vínculo |

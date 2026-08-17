@@ -135,17 +135,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return { ...token, ...updateData }
       }
 
-      const primeiroLogin = Boolean(user || account)
-
-      // O token guardava os dados do login e nunca mais olhava o banco. Resultado:
-      // trocar empresa, papel ou plano não chegava a quem já estava logado — a
-      // pessoa via o app vazio ou com permissão velha até sair e entrar, e a
-      // sessão JWT dura 30 dias. Aqui ele revalida sozinho de tempos em tempos.
-      const REVALIDAR_A_CADA_MS = 5 * 60 * 1000
-      const validadoEm = typeof token.validadoEm === "number" ? token.validadoEm : 0
-      const vencido    = Date.now() - validadoEm > REVALIDAR_A_CADA_MS
-
-      if (primeiroLogin || vencido) {
+      // ⚠️ NÃO consultar o banco aqui fora do login. Tentado na v1.10 e revertido
+      // no mesmo dia, em produção, com perda de trabalho de usuário.
+      //
+      // O `middleware.ts` envolve `auth()` com matcher que pega quase toda
+      // requisição, e `auth()` executa este callback. Uma consulta ao banco aqui
+      // vira consulta ao banco em CADA navegação — e se ela falhar (limite de
+      // recursos da Hostinger, pool de conexão, timeout), o callback lança, a
+      // sessão não resolve e o middleware manda a pessoa para o login no meio do
+      // trabalho, perdendo o que estava sendo digitado.
+      //
+      // Consequência aceita: mudança de empresa, papel ou plano só chega ao
+      // usuário no próximo login. Quem alterar isso no banco precisa avisar a
+      // pessoa a sair e entrar. Se um dia valer a pena resolver, o caminho NÃO é
+      // por aqui — seria revalidar em rota de página (fora do middleware), com
+      // try/catch, jamais deixando falha de banco derrubar sessão.
+      if (user || account) {
         const dbUser = await prisma.user.findUnique({
           where:   { email: token.email! },
           include: { company: { include: { plan: true } } },
@@ -161,11 +166,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.aiQuota       = dbUser.company.plan.aiQuota
           token.aiUsedTotal   = dbUser.company.aiUsedTotal
           token.role          = dbUser.role
-          token.validadoEm    = Date.now()
         }
-        // dbUser ausente (conta removida) mantém o token como está: o middleware
-        // segue barrando pelas checagens de rota, e derrubar aqui exigiria
-        // tratamento de sessão que o strategy jwt não oferece.
       }
 
       return token

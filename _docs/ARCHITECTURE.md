@@ -2,7 +2,7 @@
 
 > Leia este arquivo antes de planejar qualquer feature.
 > Para o estado atual e backlog, ver `_docs/PIPELINE.md`.
-> Última atualização: 2026-08-04 (v1.10)
+> Última atualização: 2026-08-04 (v1.10.1)
 
 ---
 
@@ -390,14 +390,21 @@ demandoo/
   então uma conta Google nova se vincula sozinha a um e-mail já cadastrado)
 - **`trustHost: true`** — obrigatório na Hostinger (proxy reverso)
 - **JWT payload:** `id, companyId, companyName, planSlug, aiQuota, aiUsedTotal, role,
-  avatarUrl, planExpiresAt, validadoEm`
+  avatarUrl, planExpiresAt`
 - Google OAuth: cria empresa automaticamente no 1º acesso, já com `emailVerified`
 
-### Revalidação do token (v1.10)
+### ⚠️ Nunca consultar o banco no `jwt` callback fora do login
 
-O `jwt` callback lia o banco **só no login**, e a sessão dura 30 dias — mudança de
-empresa, papel ou plano não chegava a quem já estava logado. Desde a v1.10 ele
-revalida a cada 5 minutos, controlado por `token.validadoEm`.
+Tentado na v1.10 (revalidação a cada 5 min) e **revertido no mesmo dia, em produção,
+com perda de trabalho de usuário**.
+
+O `middleware.ts` envolve `auth()` com matcher que pega quase toda requisição, e
+`auth()` executa o `jwt` callback. Consulta ao banco ali vira consulta em **cada
+navegação**; falhando (limite de recursos da Hostinger, pool, timeout), o callback
+lança, a sessão não resolve e o middleware redireciona para o login no meio do trabalho.
+
+**Consequência aceita:** o token carrega os dados do login até o próximo login. Mudou
+empresa, papel ou plano no banco? Avise a pessoa a sair e entrar.
 
 ### Ordem das checagens no `authorize()`
 
@@ -458,7 +465,7 @@ senha certa. O reenvio fica em `POST /api/auth/reenviar-verificacao`.
 | Timer JS desacelera em aba de fundo | Pomodoro conta por **timestamp** (`Date.now() - inicio`), nunca somando ticks de `setInterval` |
 | Conta sem `emailVerified` não faz login | O `authorize()` barra, e Google/convite já nascem verificados. Logo conta não verificada tem **zero dados** — é o que torna a faxina segura. Mas também trancava para fora quem perdia as 24h do link: por isso existe `/api/auth/reenviar-verificacao` |
 | Ordem das checagens no `authorize()` | Senha primeiro, avisos de estado depois. Na ordem inversa, o erro `EMAIL_NOT_VERIFIED` revelava a existência da conta para qualquer senha |
-| JWT só lia o banco no login | Sessão dura 30 dias: trocar empresa/papel/plano não chegava a quem estava logado. Desde a v1.10 o `jwt` callback revalida a cada 5 min via `token.validadoEm` |
+| Consulta ao banco no `jwt` callback | O middleware roda `auth()` em quase toda requisição — consulta ali vira consulta por navegação, e falha de banco vira **logout no meio do trabalho**. Tentado e revertido na v1.10.1. O token carrega os dados do login até o próximo login |
 | Delegação só no detalhe, nunca na captura | A instrução é obrigatória e não cabe na tela de captura rápida — um seletor de pessoa ali criaria delegação sem pedido, e a API recusaria com 400 |
 | Delegação exige plano de equipe | `maxUsers = 1` (free/basic/complete) bloqueia o convite em `/equipe`, então não há para quem delegar — a v1.9 fica inerte, sem erro aparente. Planos com vaga: `trial` (5), `basic_equipe` (5), `complete_equipe` (20). Convite **pendente** também ocupa vaga |
 | Regra de "intocada" duplicada em leitura e escrita | `cancelavel` (leitura) e o `DELETE` precisam ignorar comentários `STATUS` — a própria delegação cria um. Se divergirem, o botão aparece e a ação é recusada |
