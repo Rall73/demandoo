@@ -3,6 +3,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { parseDataOpcionalBRT } from "@/lib/date"
 import { carregarDelegacao } from "@/lib/delegacao-db"
+import { sendDelegacaoEmail } from "@/lib/email"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -67,7 +68,7 @@ export async function POST(req: Request, { params }: Ctx) {
     // O destinatário tem que ser membro ativo da MESMA empresa
     const para = await prisma.user.findFirst({
       where:  { id: paraUserId, companyId, deletedAt: null, active: true },
-      select: { id: true, name: true },
+      select: { id: true, name: true, email: true },
     })
     if (!para) return NextResponse.json({ error: "Membro não encontrado." }, { status: 404 })
 
@@ -138,6 +139,20 @@ export async function POST(req: Request, { params }: Ctx) {
         },
       })
     })
+
+    // E-mail depois da transação e sem await: falha de SMTP não pode desfazer
+    // uma delegação que já está gravada, nem derrubar a resposta.
+    sendDelegacaoEmail(
+      para.email,
+      para.name,
+      quem,
+      mae.titulo,
+      instrucao,
+      demandaId,
+      prazoRetorno
+        ? prazoRetorno.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
+        : null,
+    ).catch((err) => console.error("[delegar] e-mail falhou:", err))
 
     const delegacao = await carregarDelegacao(demandaId, companyId)
     return NextResponse.json({ delegacao }, { status: 201 })

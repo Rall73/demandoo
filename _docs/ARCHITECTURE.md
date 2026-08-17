@@ -2,7 +2,7 @@
 
 > Leia este arquivo antes de planejar qualquer feature.
 > Para o estado atual e backlog, ver `_docs/PIPELINE.md`.
-> Última atualização: 2026-08-04 (v1.10.1)
+> Última atualização: 2026-08-04 (v1.11)
 
 ---
 
@@ -290,6 +290,7 @@ demandoo/
 │   │   │   │   ├── [id]/              # Detalhe + histórico + relatório IA
 │   │   │   │   ├── calendario/
 │   │   │   │   ├── foco/              # Quadro de foco — Kanban drag-and-drop (v1.3)
+│   │   │   │   │                      # abas Todas/Delegadas/Recebidas (v1.11)
 │   │   │   │   ├── diario/            # Módulo Diário — timeline + sessões de foco (v1.4)
 │   │   │   │   │   └── DiarioClient.tsx
 │   │   │   │   ├── resumo/            # Resumo do mês — fechamento mensal (v1.6)
@@ -466,6 +467,7 @@ senha certa. O reenvio fica em `POST /api/auth/reenviar-verificacao`.
 | Conta sem `emailVerified` não faz login | O `authorize()` barra, e Google/convite já nascem verificados. Logo conta não verificada tem **zero dados** — é o que torna a faxina segura. Mas também trancava para fora quem perdia as 24h do link: por isso existe `/api/auth/reenviar-verificacao` |
 | Ordem das checagens no `authorize()` | Senha primeiro, avisos de estado depois. Na ordem inversa, o erro `EMAIL_NOT_VERIFIED` revelava a existência da conta para qualquer senha |
 | Consulta ao banco no `jwt` callback | O middleware roda `auth()` em quase toda requisição — consulta ali vira consulta por navegação, e falha de banco vira **logout no meio do trabalho**. Tentado e revertido na v1.10.1. O token carrega os dados do login até o próximo login |
+| E-mail disparado dentro de transação | Falha de SMTP não pode desfazer trabalho já gravado. Todo envio vai **depois** do `$transaction`, **sem `await`**, com `.catch()` — no pior caso o aviso não chega |
 | Delegação só no detalhe, nunca na captura | A instrução é obrigatória e não cabe na tela de captura rápida — um seletor de pessoa ali criaria delegação sem pedido, e a API recusaria com 400 |
 | Delegação exige plano de equipe | `maxUsers = 1` (free/basic/complete) bloqueia o convite em `/equipe`, então não há para quem delegar — a v1.9 fica inerte, sem erro aparente. Planos com vaga: `trial` (5), `basic_equipe` (5), `complete_equipe` (20). Convite **pendente** também ocupa vaga |
 | Regra de "intocada" duplicada em leitura e escrita | `cancelavel` (leitura) e o `DELETE` precisam ignorar comentários `STATUS` — a própria delegação cria um. Se divergirem, o botão aparece e a ação é recusada |

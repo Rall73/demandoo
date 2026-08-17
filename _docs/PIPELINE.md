@@ -2,7 +2,7 @@
 
 > Documento vivo de acompanhamento do projeto.
 > Atualizado a cada ciclo de desenvolvimento.
-> **Última atualização:** 2026-08-04 (v1.10.1)
+> **Última atualização:** 2026-08-04 (v1.11)
 
 ---
 
@@ -685,6 +685,31 @@ autoatendimento** (caso real: o Gabriel, id 15, destravado por SQL).
 > **Verificado localmente:** honeypot devolve sucesso sem criar usuário nem token;
 > 4ª tentativa de cadastro no mesmo IP retorna 429 com `Retry-After: 3600`.
 
+### ✅ 4.29 Delegação: Foco e notificações (v1.11)
+
+Fecha a delegação iniciada na v1.9. **Sem mudança de schema.**
+
+| Item | Status |
+|---|---|
+| Abas **Todas / Delegadas / Recebidas** no Quadro de Foco, com contagem | ✅ |
+| Abas só aparecem se houver delegação — quem não usa não vê ruído | ✅ |
+| Selo no card: "com Fulano" (delegada) e "de Fulano" (recebida) | ✅ |
+| Selo vira verde "retornou de Fulano" quando a devolutiva chega | ✅ |
+| `sendDelegacaoEmail` — avisa o delegado, com a instrução e o prazo de retorno | ✅ |
+| `sendDevolutivaEmail` — avisa quem delegou, com o texto do retorno | ✅ |
+
+> **As abas são recorte, não quadro novo:** filtram sobre as MINHAS demandas
+> (delegadas = as que geraram filha; recebidas = as que vieram de alguém). As
+> colunas de status e o arrastar continuam iguais, e nenhuma query cruza usuário.
+
+> **E-mail nunca derruba a operação:** disparado **depois** da transação e **sem
+> `await`**, com `.catch()`. Se o SMTP falhar, a delegação já está gravada e a
+> resposta não cai — no máximo o aviso não chega. É a lição do incidente da v1.10:
+> antes de entregar, perguntar o que o usuário perde se a chamada falhar.
+
+> **Verificado no navegador** com cenário montado no dev: contagens Todas 3 /
+> Delegadas 1 / Recebidas 1, e cada aba filtrando corretamente.
+
 ### ✅ 4.16 Páginas Públicas
 
 | Página | Status |
@@ -737,16 +762,12 @@ para não desestruturar o que já funciona.
 
 #### ~~v1.9 — Delegação em cadeia (núcleo)~~ ✅ entregue em 2026-08-03 (ver 4.27)
 
-#### v1.11 — Delegação: Foco e notificações
+#### ~~v1.11 — Delegação: Foco e notificações~~ ✅ entregue em 2026-08-04 (ver 4.29)
 
-Resto da delegação, fatiado a pedido do Ricardo para testar o núcleo antes de
-mexer no Quadro de Foco, que é tela de uso diário.
+#### Delegação — o que sobrou para depois
 
 | Item | Prioridade |
 |---|---|
-| Foco: abas **Delegadas** (minhas que geraram filha) e **Recebidas** (minhas vindas de alguém) | 🔴 |
-| E-mail "nova demanda delegada" para o delegado | 🔴 |
-| E-mail "retorno registrado" para quem delegou | 🟡 |
 | Resumo do mês: bloco de delegações feitas/recebidas e taxa de retorno no prazo | 🟡 |
 | Regra de quem pode delegar para quem (hoje: qualquer membro ativo da empresa) | 🟡 |
 | "Promover ação a demanda" (vira demanda própria, vinculada via v1.8) e delegar a demanda | 🟡 |
@@ -809,8 +830,6 @@ criar demanda nova por cron — esta última polui dashboard e resumo mensal com
 
 | Item | Prioridade |
 |---|---|
-| E-mail: nova demanda delegada | 🔴 — movido para a v1.11 |
-| E-mail: retorno da delegação registrado | 🔴 — movido para a v1.11 |
 | E-mail: demanda concluída (para solicitante) | 🟡 |
 | Notificações in-app (badge sidebar) | 🟡 |
 
@@ -891,6 +910,7 @@ Ideia levantada em 2026-06-07: Ricardo usa a mesma conta para demandas profissio
 | 2026-08-02 | v1.6 | Resumo do mês: fechamento mensal em `/app/resumo` com movimento por tipo, prazos, tempo de foco, Diário, tags e comparativo com o mês anterior; impressão, PDF e Word. Sem mudança de schema |
 | 2026-08-02 | v1.7 | Prazo nas ações: API aceita `prazo`, definição inline no checklist do detalhe, badge por situação (vencida/hoje/futura) e contador de vencidas; acende o painel "Ações de hoje" do Diário, onde a ação cumprida permanece marcada em vez de sumir. Sem mudança de schema |
 | 2026-08-03 | v1.9 | Delegação em cadeia (núcleo): tabela `delegacoes`, desenho demanda-filha, painel de delegação nos três papéis, devolutiva, cancelamento só se intocada; campo "Delegado" vira seletor de membros |
+| 2026-08-04 | v1.11 | Delegação fechada: abas Todas/Delegadas/Recebidas no Quadro de Foco com selo nos cards, e e-mails de "demanda delegada" e "retorno registrado" — disparados fora da transação e sem `await` |
 | 2026-08-04 | v1.10.1 | **Revert** da revalidação periódica do JWT: derrubava sessão em produção quando a consulta ao banco falhava dentro do middleware, com perda de trabalho do usuário |
 | 2026-08-04 | v1.10 | Higiene de contas: reenvio de verificação, `nova-senha` verificando e-mail, rate limit por IP, honeypot no cadastro, faxina de não verificados (em ensaio), ordem das checagens no login e revalidação periódica do JWT |
 | 2026-08-03 | v1.9.1 | Delegação passa a carregar **instrução** em vez de copiar o checklist da mãe (evita dois checklists desconectados); instrução obrigatória e registrada de forma imutável em `delegacoes.instrucao`. Captura: delegação removida da tela (não havia onde escrever a instrução) e prazo por ação adicionado |

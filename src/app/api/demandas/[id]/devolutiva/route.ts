@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { carregarDelegacao } from "@/lib/delegacao-db"
+import { sendDevolutivaEmail } from "@/lib/email"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -43,7 +44,11 @@ export async function POST(req: Request, { params }: Ctx) {
         demandaFilhaId:     filhaId,
         delegadoParaUserId: userId,
       },
-      select: { id: true, demandaOrigemId: true },
+      select: {
+        id: true, demandaOrigemId: true,
+        delegadoPor: { select: { name: true, email: true } },
+        origem:      { select: { titulo: true } },
+      },
     })
     if (!delegacao) {
       return NextResponse.json(
@@ -85,6 +90,16 @@ export async function POST(req: Request, { params }: Ctx) {
         })
       }
     })
+
+    // Sem await, mesmo motivo do delegar: o retorno já está gravado
+    sendDevolutivaEmail(
+      delegacao.delegadoPor.email,
+      delegacao.delegadoPor.name,
+      quem,
+      delegacao.origem.titulo,
+      texto,
+      delegacao.demandaOrigemId,
+    ).catch((err) => console.error("[devolutiva] e-mail falhou:", err))
 
     const atualizada = await carregarDelegacao(filhaId, companyId)
     return NextResponse.json({ delegacao: atualizada })

@@ -7,7 +7,7 @@ import {
   Inbox, CheckSquare, Lightbulb,
   Clock, PlayCircle, PauseCircle,
   AlertCircle, ChevronRight, ArrowUpDown,
-  Loader2, X, Check, Timer,
+  Loader2, X, Check, Timer, CornerDownRight, CornerLeftDown,
 } from "lucide-react"
 import { usePomodoro } from "@/components/pomodoro/PomodoroProvider"
 
@@ -17,6 +17,8 @@ type Tipo       = "DEMANDA" | "TAREFA" | "IDEIA"
 type Status     = "ABERTA" | "EM_ANDAMENTO" | "EM_ESPERA"
 type Prioridade = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA"
 type Ordenacao  = "PADRAO" | "CRIACAO" | "VENCIMENTO" | "IMPORTANCIA"
+/** Aba de delegação: divide o quadro sem alterar as colunas de status */
+type Aba        = "TODAS" | "DELEGADAS" | "RECEBIDAS"
 
 export interface DemandaFoco {
   id:               number
@@ -29,6 +31,15 @@ export interface DemandaFoco {
   focoIniciadoEm:   string | null
   focoMotivoEspera: string | null
   createdAt:        string
+  /** Nomes de quem recebeu esta demanda por delegação (pode ser mais de um) */
+  delegadaPara:       string[]
+  /** true quando todas as delegações feitas já têm devolutiva */
+  delegadaRespondida: boolean
+  /** Nome de quem delegou esta demanda para mim, se veio de delegação */
+  recebidaDe:         string | null
+  recebidaRespondida: boolean
+  /** Prazo de retorno da delegação — ISO, ou null */
+  prazoRetorno:       string | null
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -179,6 +190,27 @@ function DemandaCard({
           {urgente && <AlertCircle size={11} strokeWidth={2.5} />}
           <Clock size={11} strokeWidth={2} />
           {prazoText}
+        </div>
+      )}
+
+      {/* Selo de delegação — "aguardando" enquanto não veio devolutiva */}
+      {demanda.delegadaPara.length > 0 && (
+        <div className={`flex items-center gap-1 text-xs font-medium mb-2 ${
+          demanda.delegadaRespondida ? "text-emerald-600" : "text-violet-600"
+        }`}>
+          <CornerDownRight size={11} strokeWidth={2.5} />
+          {demanda.delegadaRespondida ? "retornou de " : "com "}
+          {demanda.delegadaPara.join(", ")}
+        </div>
+      )}
+
+      {demanda.recebidaDe && (
+        <div className="flex items-center gap-1 text-xs font-medium text-violet-600 mb-2">
+          <CornerLeftDown size={11} strokeWidth={2.5} />
+          de {demanda.recebidaDe}
+          {demanda.recebidaRespondida && (
+            <span className="text-emerald-600">· respondida</span>
+          )}
         </div>
       )}
 
@@ -416,14 +448,24 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
   const [pendingEspera, setPendingEspera] = useState<{ id: number; de: Status } | null>(null)
   const [pendingLonga,  setPendingLonga]  = useState<{ id: number; para: Status; horas: number } | null>(null)
   const [filtroTipo,    setFiltroTipo]    = useState<Tipo | "TODOS">("TODOS")
+  const [aba,           setAba]           = useState<Aba>("TODAS")
   const [ordenacao,     setOrdenacao]     = useState<Ordenacao>("PADRAO")
 
   const itensFiltrados = useMemo(() => {
-    const filtrados = filtroTipo === "TODOS"
+    let filtrados = filtroTipo === "TODOS"
       ? itens
       : itens.filter((d) => d.tipo === filtroTipo)
+
+    // Abas de delegação: ambas são recortes das MINHAS demandas — "delegadas"
+    // são as que eu passei adiante, "recebidas" as que chegaram para mim.
+    if (aba === "DELEGADAS") filtrados = filtrados.filter((d) => d.delegadaPara.length > 0)
+    if (aba === "RECEBIDAS") filtrados = filtrados.filter((d) => d.recebidaDe !== null)
+
     return aplicarOrdenacao(filtrados, ordenacao)
-  }, [itens, filtroTipo, ordenacao])
+  }, [itens, filtroTipo, aba, ordenacao])
+
+  const totalDelegadas = itens.filter((d) => d.delegadaPara.length > 0).length
+  const totalRecebidas = itens.filter((d) => d.recebidaDe !== null).length
 
   const aFazer   = itensFiltrados.filter((d) => d.status === "ABERTA")
   const emFoco   = itensFiltrados.filter((d) => d.status === "EM_ANDAMENTO")
@@ -549,6 +591,36 @@ export default function FocoBoard({ demandas: inicial }: { demandas: DemandaFoco
             </select>
           </div>
         </div>
+
+        {/* Abas de delegação — só aparecem se houver o que mostrar */}
+        {(totalDelegadas > 0 || totalRecebidas > 0) && (
+          <div className="flex gap-1 mt-4 border-b border-slate-200">
+            {([
+              { valor: "TODAS"     as Aba, label: "Todas",     n: itens.length },
+              { valor: "DELEGADAS" as Aba, label: "Delegadas", n: totalDelegadas },
+              { valor: "RECEBIDAS" as Aba, label: "Recebidas", n: totalRecebidas },
+            ]).map(({ valor, label, n }) => {
+              const ativo = aba === valor
+              return (
+                <button
+                  key={valor}
+                  onClick={() => setAba(valor)}
+                  className={`
+                    px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors
+                    ${ativo
+                      ? "border-violet-600 text-violet-700"
+                      : "border-transparent text-slate-500 hover:text-slate-700"}
+                  `}
+                >
+                  {label}
+                  <span className={`ml-1.5 text-xs ${ativo ? "text-violet-500" : "text-slate-400"}`}>
+                    {n}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {/* Filtro por tipo */}
         <div className="flex gap-2 mt-4 flex-wrap">

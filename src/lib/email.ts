@@ -215,3 +215,74 @@ export async function sendPasswordResetEmail(email: string, token: string): Prom
     `,
   })
 }
+
+/** Avisa o delegado de que recebeu uma demanda, com a instrução do que foi pedido. */
+export async function sendDelegacaoEmail(
+  email:        string,
+  nomeDelegado: string,
+  nomeDelegante: string,
+  titulo:       string,
+  instrucao:    string,
+  demandaId:    number,
+  prazoRetorno: string | null,
+): Promise<void> {
+  const url = `${APP_URL}/app/${demandaId}`
+
+  await makeTransporter().sendMail({
+    from:    FROM,
+    to:      email,
+    subject: `${nomeDelegante} delegou uma demanda para você: ${titulo}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#7c3aed">Você recebeu uma demanda</h2>
+        <p>Olá, ${nomeDelegado}!</p>
+        <p><strong>${nomeDelegante}</strong> delegou uma demanda para você no demandoo.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0">
+          <p style="margin:0 0 8px 0;font-weight:600;color:#1e293b">${titulo}</p>
+          <p style="margin:0;color:#475569;white-space:pre-wrap">${instrucao}</p>
+        </div>
+        ${prazoRetorno
+          ? `<p style="color:#b45309;font-weight:600">Retorno esperado até ${prazoRetorno}.</p>`
+          : ""}
+        <a href="${url}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
+          Abrir demanda
+        </a>
+        <p style="color:#64748b;font-size:13px;margin-top:16px">
+          Ao concluir, registre a devolutiva na própria demanda — ela chega direto para quem delegou.
+        </p>
+      </div>
+    `,
+  })
+}
+
+/** Avisa quem delegou de que o retorno foi registrado. */
+export async function sendDevolutivaEmail(
+  email:         string,
+  nomeDelegante: string,
+  nomeDelegado:  string,
+  titulo:        string,
+  devolutiva:    string,
+  demandaId:     number,
+): Promise<void> {
+  const url = `${APP_URL}/app/${demandaId}`
+
+  await makeTransporter().sendMail({
+    from:    FROM,
+    to:      email,
+    subject: `${nomeDelegado} registrou o retorno: ${titulo}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#059669">Retorno registrado</h2>
+        <p>Olá, ${nomeDelegante}!</p>
+        <p><strong>${nomeDelegado}</strong> devolveu a demanda que você delegou.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0">
+          <p style="margin:0 0 8px 0;font-weight:600;color:#1e293b">${titulo}</p>
+          <p style="margin:0;color:#475569;white-space:pre-wrap">${devolutiva}</p>
+        </div>
+        <a href="${url}" style="display:inline-block;background:#059669;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
+          Ver demanda
+        </a>
+      </div>
+    `,
+  })
+}
